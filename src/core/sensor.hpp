@@ -5,29 +5,89 @@
 
 class Sensor
 {
+    protected:
+        bool initialized = false;
+
+        virtual float measuredValue(const Measurement& m) const = 0;
+
     private:
-        const char *sensorName; 
-        const char *unit; 
+        char sensorName[32];
+        char unit[16];
+        static inline int sensorCount;
 
     public:
-        Sensor(const char *name, const char *unit) : sensorName(name), unit(unit) {}
+        Sensor();
+        Sensor(const char* name);
+        Sensor(const char* name, const char* unit);
 
-        const char *getName() const { return sensorName; }
-        const char *getUnit() const { return unit; }
+        virtual ~Sensor();
+
+        const char* getName() const;
+        const char* getUnit() const;
+        bool isInitialized() const;
+        static int getSensorCount();
 
         virtual bool begin() = 0;
         virtual void read(Measurement& m) = 0;
 
-        virtual const char *displayValue(const Measurement& m)
-        {
-            static char buffer[32];
-            snprintf(buffer, sizeof(buffer), "%s: %.2f %s", getName(), measuredValue(m), getUnit());
-            return buffer;
-        }
-
-    protected:
-        virtual float measuredValue(const Measurement& m) const = 0;
-
-    public:
-        virtual ~Sensor() {}
+        const char* displayValue(const Measurement& m) const;
 };
+
+inline Sensor::Sensor() : Sensor("", "")
+{
+    snprintf(sensorName, sizeof(sensorName), "Sensor_%d", sensorCount++);
+}
+
+inline Sensor::Sensor(const char* name) : Sensor(name, "")
+{
+
+}
+
+inline Sensor::Sensor(const char* name, const char* unit)
+{
+    snprintf(sensorName, sizeof(sensorName), "%s", name);
+    snprintf(this->unit, sizeof(this->unit), "%s", unit);
+
+    Sensor::sensorCount++;
+}
+
+inline const char* Sensor::getName() const
+{
+    return sensorName;
+}
+
+inline const char* Sensor::getUnit() const
+{
+    return unit;
+}
+
+inline int Sensor::getSensorCount()
+{
+    return sensorCount;
+}
+
+inline bool Sensor::isInitialized() const
+{
+    return initialized;
+}
+
+inline const char* Sensor::displayValue(const Measurement& m) const 
+{
+    static char buffer[64];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%s: %.2f %s",
+        getName(),
+        measuredValue(m),
+        getUnit()
+    );
+
+    return buffer;
+}
+
+inline Sensor::~Sensor()
+{
+    sensorCount--;
+}
