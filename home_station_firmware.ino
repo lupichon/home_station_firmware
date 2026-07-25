@@ -1,15 +1,19 @@
 #include <Arduino.h>
 
 #include "src/core/measurement.hpp"
-#include "src/core/sensor.hpp"
 #include "src/core/pins.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
+#include "src/communication/data_serializer.hpp"
+#include "src/communication/bluetooth/bluetooth.hpp"
+//#include "src/communication/wifi/wifi.hpp"
 
 #define DEBUG_ENABLE 1
 
-// Declaration of the Serial object for debugging
+// Declaration of communcation interfaces
 extern HardwareSerial Serial;
+BluetoothCommunication bluetooth("HomeStation");
+//WiFiCommunication wifi("your_ssid", "your_password");
 
 // Declaration of all the sensors used in the project
 BH1750Sensor  lightSensor;                   // Luminosity sensor
@@ -26,16 +30,42 @@ int sensorCount = Sensor::getSensorCount();
 
 void setup()
 {
+    Serial.begin(115200);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    bluetooth.begin();
+    //wifi.begin();
+
     if (DEBUG_ENABLE)
     {
-        Serial.begin(115200);
-        while (!Serial) 
-        { 
-            delay(10); // Wait for Serial to be ready
+        while (!Serial)
+        {
+            delay(10);
         }
-    }
 
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+        Serial.println("========  HomeStation Firmware  ========");
+        Serial.print("Number of sensors: ");
+        Serial.println(sensorCount);
+
+        if (bluetooth.isInitialized())
+        {
+            Serial.println("Bluetooth used.");
+        }
+        else
+        {
+            Serial.println("Bluetooth not used");
+        }
+
+        // if (wifi.isConnected())
+        // {
+        //     Serial.println("WiFi used.");
+        // }
+        // else
+        // {
+        //     Serial.println("WiFi not used");
+        // }
+
+        Serial.println("========================================");
+    }
 
     for(int i = 0; i < sensorCount; i++)
     {
@@ -79,6 +109,24 @@ void loop()
             if (DEBUG_ENABLE)
             {
                 Serial.println(sensor.displayValue(measurement));
+            }
+        }
+    }
+
+    // Serialize the Measurement object into a byte buffer
+    uint8_t buffer[BUFFER_SIZE];
+    size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
+
+    if (dataSize > 0)
+    {
+        // Send the measurement data over Bluetooth if the Bluetooth interface is initialized and a least one client is connected
+        if (bluetooth.isInitialized() && bluetooth.hasConnectedClient())
+        {
+            bluetooth.send(buffer, dataSize);
+
+            if (DEBUG_ENABLE)
+            {
+                Serial.println("Data sent over Bluetooth.");
             }
         }
     }

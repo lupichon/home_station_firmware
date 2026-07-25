@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdio.h>
-#include "measurement.hpp"
+#include "../core/measurement.hpp"
 
 class Sensor
 {

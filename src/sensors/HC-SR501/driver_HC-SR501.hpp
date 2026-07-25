@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../../core/sensor.hpp"
+#include "../sensor.hpp"
 
 class HCSR501Sensor : public Sensor
 {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <BH1750.h>
-#include "../../core/sensor.hpp"
+#include "../sensor.hpp"
 
 class BH1750Sensor : public Sensor
 {
