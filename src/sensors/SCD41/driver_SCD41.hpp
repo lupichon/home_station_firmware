@@ -16,6 +16,7 @@ class SCD41Sensor : public Sensor
 
         bool begin() override;
         void read(Measurement& m) override;
+        const char* displayValue(const Measurement& m) const;
 
     protected:
         float measuredValue(const Measurement& m) const override;
@@ -64,4 +65,21 @@ inline void SCD41Sensor::read(Measurement& m)
 inline float SCD41Sensor::measuredValue(const Measurement& m) const
 {
     return m.co2;
+}
+
+inline const char* SCD41Sensor::displayValue(const Measurement& m) const
+{
+    static char buffer[128];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%s: CO2=%.0f ppm | Temp=%.2f C | Hum=%.2f %%",
+        getName(),
+        m.co2,
+        m.temperature,
+        m.humidity
+    );
+
+    return buffer;
 }

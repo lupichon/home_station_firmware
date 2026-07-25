@@ -16,6 +16,7 @@ class HCSR501Sensor : public Sensor
 
         bool begin() override;
         void read(Measurement& m) override;
+        const char* displayValue(const Measurement& m) const;
 
     protected:
         float measuredValue(const Measurement& m) const override;
@@ -70,4 +71,19 @@ inline void IRAM_ATTR HCSR501Sensor::handleInterrupt(void* arg)
 {
     HCSR501Sensor* sensor = static_cast<HCSR501Sensor*>(arg);
     sensor->motionDetected = true;
+}
+
+inline const char* HCSR501Sensor::displayValue(const Measurement& m) const
+{
+    static char buffer[64];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%s: %s",
+        getName(),
+        m.motion ? "Motion detected" : "No motion"
+    );
+
+    return buffer;
 }

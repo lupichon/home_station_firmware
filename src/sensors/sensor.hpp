@@ -30,7 +30,7 @@ class Sensor
         virtual bool begin() = 0;
         virtual void read(Measurement& m) = 0;
 
-        const char* displayValue(const Measurement& m) const;
+        virtual const char* displayValue(const Measurement& m) const = 0;
 };
 
 inline Sensor::Sensor() : Sensor("", "")
@@ -69,22 +69,6 @@ inline int Sensor::getSensorCount()
 inline bool Sensor::isInitialized() const
 {
     return initialized;
-}
-
-inline const char* Sensor::displayValue(const Measurement& m) const 
-{
-    static char buffer[64];
-
-    snprintf(
-        buffer,
-        sizeof(buffer),
-        "%s: %.2f %s",
-        getName(),
-        measuredValue(m),
-        getUnit()
-    );
-
-    return buffer;
 }
 
 inline Sensor::~Sensor()

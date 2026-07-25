@@ -13,6 +13,7 @@ class BH1750Sensor : public Sensor
 
         bool begin() override;
         void read(Measurement& m) override;
+        const char* displayValue(const Measurement& m) const override;
 
     protected:
         float measuredValue(const Measurement& m) const override;
@@ -38,4 +39,20 @@ inline void BH1750Sensor::read(Measurement& m)
 inline float BH1750Sensor::measuredValue(const Measurement& m) const
 {
     return m.luminosity;
+}
+
+inline const char* BH1750Sensor::displayValue(const Measurement& m) const
+{
+    static char buffer[64];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%s: %.2f %s",
+        getName(),
+        measuredValue(m),
+        getUnit()
+    );
+
+    return buffer;
 }
