@@ -4,6 +4,7 @@
 #include "src/core/pins.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
+#include "src/sensors/SCD41/driver_SCD41.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
@@ -18,12 +19,14 @@ BluetoothCommunication bluetooth("HomeStation");
 // Declaration of all the sensors used in the project
 BH1750Sensor  lightSensor;                   // Luminosity sensor
 HCSR501Sensor motionSensor(HC_SR501_PIN);    // Motion sensor
+SCD41Sensor   co2TempHumiSensor;             // CO2, temperature and humidity sensor
 
 // Array of pointers to the sensors used in the project
 Sensor* sensors[] =
 {
     &lightSensor,
-    &motionSensor   
+    &motionSensor,
+    &co2TempHumiSensor
 };
 
 int sensorCount = Sensor::getSensorCount();

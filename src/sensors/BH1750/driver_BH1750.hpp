@@ -26,7 +26,7 @@ inline BH1750Sensor::BH1750Sensor()
 
 inline bool BH1750Sensor::begin()
 {
-    initialized = sensor.begin();
+    initialized = sensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire);
     return initialized;
 }
 
