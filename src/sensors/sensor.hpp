@@ -26,7 +26,7 @@ class Sensor
         static int getSensorCount();
 
         virtual bool begin() = 0;
-        virtual void read(Measurement& m) = 0;
+        virtual bool read(Measurement& m) = 0;
 
         virtual const char* displayValue(const Measurement& m) const = 0;
 };

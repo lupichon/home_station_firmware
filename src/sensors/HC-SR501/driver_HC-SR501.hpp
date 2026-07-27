@@ -15,7 +15,7 @@ class HCSR501Sensor : public Sensor
         HCSR501Sensor(int pin);
 
         bool begin() override;
-        void read(Measurement& m) override;
+        bool read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const;
 };
 
@@ -50,13 +50,14 @@ inline bool HCSR501Sensor::begin()
     return initialized;
 }
 
-inline void HCSR501Sensor::read(Measurement& m)
+inline bool HCSR501Sensor::read(Measurement& m)
 {
     // Update the motion value in the Measurement struct
     m.motion = motionDetected;
 
     // Reset the motionDetected flag after reading
     motionDetected = false;
+    return true;
 }
 
 inline void IRAM_ATTR HCSR501Sensor::handleInterrupt(void* arg)

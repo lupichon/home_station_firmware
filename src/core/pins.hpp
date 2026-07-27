@@ -37,3 +37,6 @@ constexpr uint8_t MAX9814_PIN  = PIN_GPIO_35;
 constexpr uint8_t FC_51_PIN    = PIN_GPIO_15;
 constexpr uint8_t I2C_SDA_PIN  = PIN_GPIO_21;
 constexpr uint8_t I2C_SCL_PIN  = PIN_GPIO_22;
+constexpr uint8_t STATUS_LED_RED_PIN   = PIN_GPIO_25;
+constexpr uint8_t STATUS_LED_GREEN_PIN = PIN_GPIO_26;
+constexpr uint8_t STATUS_LED_BLUE_PIN  = PIN_GPIO_27;

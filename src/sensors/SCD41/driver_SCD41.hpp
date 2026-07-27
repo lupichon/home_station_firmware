@@ -15,7 +15,7 @@ class SCD41Sensor : public Sensor
         SCD41Sensor();
 
         bool begin() override;
-        void read(Measurement& m) override;
+        bool read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const;
 };
 
@@ -38,7 +38,7 @@ inline bool SCD41Sensor::begin()
 }
 
 
-inline void SCD41Sensor::read(Measurement& m)
+inline bool SCD41Sensor::read(Measurement& m)
 {
     uint16_t co2;
     float temperature;
@@ -50,12 +50,16 @@ inline void SCD41Sensor::read(Measurement& m)
         humidity
     );
 
-    if (error == 0)
+    if (error != 0)
     {
-        m.co2 = co2;
-        m.temperature = temperature;
-        m.humidity = humidity;
+        return false;
     }
+
+    m.co2 = co2;
+    m.temperature = temperature;
+    m.humidity = humidity;
+
+    return true;    
 }
 
 inline const char* SCD41Sensor::displayValue(const Measurement& m) const

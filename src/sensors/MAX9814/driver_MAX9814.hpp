@@ -23,7 +23,7 @@ class MAX9814Sensor : public Sensor
         MAX9814Sensor(int pin);
 
         bool begin() override;
-        void read(Measurement& m) override;
+        bool read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const override;
 };
 
@@ -67,10 +67,11 @@ inline void MAX9814Sensor::onTimer(void* arg)
     }
 }
 
-inline void MAX9814Sensor::read(Measurement& m)
+inline bool MAX9814Sensor::read(Measurement& m)
 {
     m.sound = soundDetected;
     soundDetected = false;
+    return true;
 }
 
 inline const char* MAX9814Sensor::displayValue(const Measurement& m) const

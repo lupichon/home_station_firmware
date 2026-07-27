@@ -12,10 +12,9 @@ class BH1750Sensor : public Sensor
         BH1750Sensor();
 
         bool begin() override;
-        void read(Measurement& m) override;
+        bool read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const override;
 };
-
 
 inline BH1750Sensor::BH1750Sensor()
     : Sensor("BH1750", "lux")
@@ -28,9 +27,17 @@ inline bool BH1750Sensor::begin()
     return initialized;
 }
 
-inline void BH1750Sensor::read(Measurement& m)
+inline bool BH1750Sensor::read(Measurement& m)
 {
-    m.luminosity = sensor.readLightLevel();
+    float value = sensor.readLightLevel();
+
+    if (value < 0)
+    {
+        return false;
+    }
+    
+    m.luminosity = value;
+    return true;
 }
 
 inline const char* BH1750Sensor::displayValue(const Measurement& m) const

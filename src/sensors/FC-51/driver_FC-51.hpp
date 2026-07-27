@@ -14,7 +14,7 @@ class FC51Sensor : public Sensor
         FC51Sensor(int pin);
 
         bool begin() override;
-        void read(Measurement& m) override;
+        bool read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const override;
 };
 
@@ -36,12 +36,23 @@ inline bool FC51Sensor::begin()
 }
 
 
-inline void FC51Sensor::read(Measurement& m)
+inline bool FC51Sensor::read(Measurement& m)
 {
     m.obstacle = (digitalRead(pin) == LOW);
+    return true;
 }
 
 inline const char* FC51Sensor::displayValue(const Measurement& m) const
 {
-    return m.obstacle ? "Obstacle detected" : "No obstacle";
+    static char buffer[64];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%s: %s",
+        getName(),
+        m.obstacle ? "Obstacle detected" : "No obstacle"
+    );
+
+    return buffer;
 }
