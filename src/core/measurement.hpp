@@ -11,4 +11,5 @@ struct Measurement
     float luminosity  = NAN;
     bool  motion      = false;
     bool  sound       = false;
+    bool  obstacle    = false;
 };
