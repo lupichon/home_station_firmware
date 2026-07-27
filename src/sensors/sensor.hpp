@@ -8,8 +8,6 @@ class Sensor
     protected:
         bool initialized = false;
 
-        virtual float measuredValue(const Measurement& m) const = 0;
-
     private:
         char sensorName[32];
         char unit[16];

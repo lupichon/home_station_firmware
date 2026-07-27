@@ -17,9 +17,6 @@ class HCSR501Sensor : public Sensor
         bool begin() override;
         void read(Measurement& m) override;
         const char* displayValue(const Measurement& m) const;
-
-    protected:
-        float measuredValue(const Measurement& m) const override;
 };
 
 
@@ -60,11 +57,6 @@ inline void HCSR501Sensor::read(Measurement& m)
 
     // Reset the motionDetected flag after reading
     motionDetected = false;
-}
-
-inline float HCSR501Sensor::measuredValue(const Measurement& m) const
-{
-    return m.motion ? 1.0f : 0.0f; 
 }
 
 inline void IRAM_ATTR HCSR501Sensor::handleInterrupt(void* arg)

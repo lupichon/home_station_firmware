@@ -10,4 +10,5 @@ struct Measurement
     float co2         = NAN;
     float luminosity  = NAN;
     bool  motion      = false;
+    bool  sound       = false;
 };

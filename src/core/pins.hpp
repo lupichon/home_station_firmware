@@ -33,5 +33,6 @@ constexpr uint8_t PIN_GPIO_39 = 39;
 // Home Station
 // ============================================================
 constexpr uint8_t HC_SR501_PIN = PIN_GPIO_34;
+constexpr uint8_t MAX9814_PIN  = PIN_GPIO_35;
 constexpr uint8_t I2C_SDA_PIN  = PIN_GPIO_21;
 constexpr uint8_t I2C_SCL_PIN  = PIN_GPIO_22;

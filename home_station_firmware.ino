@@ -5,6 +5,7 @@
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
 #include "src/sensors/SCD41/driver_SCD41.hpp"
+#include "src/sensors/MAX9814/driver_MAX9814.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
@@ -20,13 +21,15 @@ BluetoothCommunication bluetooth("HomeStation");
 BH1750Sensor  lightSensor;                   // Luminosity sensor
 HCSR501Sensor motionSensor(HC_SR501_PIN);    // Motion sensor
 SCD41Sensor   co2TempHumiSensor;             // CO2, temperature and humidity sensor
+MAX9814Sensor soundSensor(MAX9814_PIN);      // Sound sensor
 
 // Array of pointers to the sensors used in the project
 Sensor* sensors[] =
 {
     &lightSensor,
     &motionSensor,
-    &co2TempHumiSensor
+    &co2TempHumiSensor,
+    &soundSensor
 };
 
 int sensorCount = Sensor::getSensorCount();
@@ -38,7 +41,7 @@ void setup()
     bluetooth.begin();
     //wifi.begin();
 
-    if (DEBUG_ENABLE)
+    #if DEBUG_ENABLE
     {
         while (!Serial)
         {
@@ -69,27 +72,26 @@ void setup()
 
         Serial.println("========================================");
     }
+    #endif
 
     for(int i = 0; i < sensorCount; i++)
     {
         if(!sensors[i]->begin())
         {
-            if(DEBUG_ENABLE)
-            {
+            #if DEBUG_ENABLE
                 Serial.print("Error: Initialization failed for sensor: ");
                 Serial.println(sensors[i]->getName());
-            }
+            #endif
             // TODO: Faire clignoter une LED en cas de probleme d'initialisation d'un capteur
             // Ou  mieux pour que le reste fonctionne ça sera de juste allumer une LED 
             // Mais de ne pas tomber dans cette boucle infinie et de continuer à lire les autres capteurs quand meme
         }
         else
         {
-            if (DEBUG_ENABLE)
-            {
+            #if DEBUG_ENABLE
                 Serial.print("OK : ");
                 Serial.println(sensors[i]->getName());
-            }
+            #endif
         }
     }
 }
@@ -109,10 +111,9 @@ void loop()
         {
             sensor.read(measurement);
 
-            if (DEBUG_ENABLE)
-            {
+            #if DEBUG_ENABLE
                 Serial.println(sensor.displayValue(measurement));
-            }
+            #endif
         }
     }
 
@@ -127,10 +128,9 @@ void loop()
         {
             bluetooth.send(buffer, dataSize);
 
-            if (DEBUG_ENABLE)
-            {
+            #if DEBUG_ENABLE
                 Serial.println("Data sent over Bluetooth.");
-            }
+            #endif
         }
     }
     
