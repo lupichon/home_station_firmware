@@ -11,6 +11,8 @@
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
 #include "src/interface/status_led.hpp"
+#include "src/interface/display_SSD1306.hpp"
+#include "src/interface/button.hpp"
 
 #define DEBUG_ENABLE 1
 
@@ -21,11 +23,13 @@ BluetoothCommunication bluetooth("HomeStation");
 
 // Declaration of elements for the interface with the user (LEDs, buttons, screens, etc.)
 StatusLED statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
+DisplaySSD1306 screen;
+Button screenButton(SCREEN_BUTTON_PIN);
 
 // Declaration of all the sensors used in the project
 BH1750Sensor  lightSensor;                   // Luminosity sensor
 HCSR501Sensor motionSensor(HC_SR501_PIN);    // Motion sensor
-//SCD41Sensor   co2TempHumiSensor;             // CO2, temperature and humidity sensor
+SCD41Sensor   co2TempHumiSensor;             // CO2, temperature and humidity sensor
 MAX9814Sensor soundSensor(MAX9814_PIN);      // Sound sensor
 FC51Sensor    obstacleSensor(FC_51_PIN);     // Obstacle sensor
 
@@ -34,7 +38,7 @@ Sensor* sensors[] =
 {
     &lightSensor,
     &motionSensor,
-    //&co2TempHumiSensor,
+    &co2TempHumiSensor,
     &soundSensor,
     &obstacleSensor
 };
@@ -49,16 +53,22 @@ constexpr unsigned long TASK_1000_MS = 1000;
 unsigned long last1000Ms = 0; 
 unsigned long last100Ms  = 0;
 
+// Declaration of the measurement structure to hold sensor data
+Measurement measurement;
+
 void setup()
 {
     statusLED.begin();
     statusLED.setState(StatusLED::State::STARTING);
     statusLED.update(); 
+    screen.begin();
+    screenButton.begin();
 
     Serial.begin(115200);
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     bluetooth.begin();
     //wifi.begin();
+    delay(500);
 
     #if DEBUG_ENABLE
     {
@@ -126,6 +136,18 @@ void setup()
     {
         statusLED.setState(StatusLED::State::ERROR);
     }
+
+    #if DEBUG_ENABLE
+    for (uint8_t addr = 1; addr < 127; addr++)
+    {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0)
+        {
+            Serial.print("Périphérique trouvé à 0x");
+            Serial.println(addr, HEX);
+        }
+    }
+    #endif
 }
 
 
@@ -139,14 +161,21 @@ void loop()
         last100Ms = now;
         
         statusLED.update();
+        screenButton.update();
+        screen.update(measurement);
+
+        if (screenButton.wasPressed())
+        {
+            screen.buttonPressed();
+        }
     }
 
     // Task executed every 1000 ms
     if (now - last1000Ms >= TASK_1000_MS)
     {
         last1000Ms = now;
-        Measurement measurement;
         
+        clearMeasurement(measurement);
         bool successR = readSensors(measurement);  
         bool successB = sendBluetooth(measurement);
         updateStatus(successR, successB);
@@ -168,6 +197,10 @@ bool readSensors(Measurement& measurement)
             #if DEBUG_ENABLE
                 Serial.println(sensor.displayValue(measurement));
             #endif
+        }
+        else
+        {
+            success = false;
         }
     }
     return success;

@@ -12,3 +12,14 @@ struct Measurement
     bool  sound       = false;
     bool  obstacle    = false;
 };
+
+void clearMeasurement(Measurement& measurement)
+{
+    measurement.temperature = NAN;
+    measurement.humidity    = NAN;
+    measurement.co2         = NAN;
+    measurement.luminosity  = NAN;
+    measurement.motion      = false;
+    measurement.sound       = false;
+    measurement.obstacle    = false;
+}

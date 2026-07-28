@@ -4,12 +4,13 @@
 #include <Wire.h>
 #include "../sensor.hpp"
 
-// TO DO: A TESTER QUAND LA CAPTEUR SERA SOUDé
-
 class SCD41Sensor : public Sensor
 {
     private:
         SensirionI2cScd4x sensor;
+        float lastTemperature = NAN;
+        float lastHumidity = NAN;
+        float lastCO2 = NAN;
 
     public:
         SCD41Sensor();
@@ -30,6 +31,9 @@ inline bool SCD41Sensor::begin()
 {
     sensor.begin(Wire, 0x62);
 
+    sensor.stopPeriodicMeasurement(); // Stop si déjà en cours
+    delay(500);                        // Attendre que le capteur soit prêt
+
     int16_t error = sensor.startPeriodicMeasurement();
 
     initialized = (error == 0);
@@ -40,24 +44,35 @@ inline bool SCD41Sensor::begin()
 
 inline bool SCD41Sensor::read(Measurement& m)
 {
+    // TODO: Si le capteur est débranché on rentre quand meme dans le !dataReady, il faudait aller dans if de l'erreur
     uint16_t co2;
     float temperature;
     float humidity;
+
+    bool dataReady = false;
+    sensor.getDataReadyStatus(dataReady);
+    if (!dataReady)
+    {
+        m.co2 = lastCO2;
+        m.temperature = lastTemperature;
+        m.humidity = lastHumidity;
+        return true;
+    }
 
     int16_t error = sensor.readMeasurement(
         co2,
         temperature,
         humidity
     );
-
+    
     if (error != 0)
     {
         return false;
     }
 
-    m.co2 = co2;
-    m.temperature = temperature;
-    m.humidity = humidity;
+    m.co2 = lastCO2 = co2;
+    m.temperature = lastTemperature = temperature;
+    m.humidity = lastHumidity = humidity;
 
     return true;    
 }
