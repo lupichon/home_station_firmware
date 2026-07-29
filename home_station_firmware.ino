@@ -2,6 +2,7 @@
 
 #include "src/core/measurement.hpp"
 #include "src/core/pins.hpp"
+#include "src/core/storage.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
 #include "src/sensors/SCD41/driver_SCD41.hpp"
@@ -10,11 +11,16 @@
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
+#include "src/communication/LoRaWAN/lorawan.hpp"
+#include "src/communication/LoRaWAN/credentials_handler.hpp"
 #include "src/interface/status_led.hpp"
 #include "src/interface/display_SSD1306.hpp"
 #include "src/interface/button.hpp"
 
 #define DEBUG_ENABLE 1
+
+// Memory handle
+Storage storage;
 
 // Declaration of communcation interfaces
 extern HardwareSerial Serial;
@@ -58,25 +64,49 @@ Measurement measurement;
 
 void setup()
 {
+    Serial.begin(115200);
+    while (!Serial) { delay(10); } // Wait for Serial to be ready
+    delay(1000);
+
     statusLED.begin();
     statusLED.setState(StatusLED::State::STARTING);
     statusLED.update(); 
     screen.begin();
     screenButton.begin();
+    storage.begin("HomeStation", false);
 
-    Serial.begin(115200);
+    LoRaWANCommunication::RadioPins loraWANPins = {
+        .nss  = SPI_NSS_PIN,
+        .rst  = SX1276_RST_PIN,
+        .dio0 = SX1276_DIO0_PIN,
+        .dio1 = SX1276_DIO1_PIN
+    };
+
+    uint8_t appEui[8];
+    uint8_t devEui[8];
+    uint8_t appKey[16];
+    checkResetCredentialsOnBoot(storage);
+    checkAndInitCredentials(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
+    checkAndInitCredentials(storage, "appEui", "App EUI", appEui, sizeof(appEui));
+    checkAndInitCredentials(storage, "appKey", "App Key", appKey, sizeof(appKey));
+    storage.end();
+
+    lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);
+    lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
+    {
+        return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
+    });
+    lorawan.setAutoUplinkInterval(60); // Send data every 60 seconds
+
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
     bluetooth.begin();
+    lorawan.begin();
     //wifi.begin();
     delay(500);
 
     #if DEBUG_ENABLE
     {
-        while (!Serial)
-        {
-            delay(10);
-        }
-
         Serial.println("========  HomeStation Firmware  ========");
         Serial.print("Number of sensors: ");
         Serial.println(sensorCount);
@@ -99,7 +129,25 @@ void setup()
         //     Serial.println("WiFi not used");
         // }
 
+        if (lorawan.isInitialized())
+        {
+            Serial.println("LoRaWAN used.");
+        }
+        else
+        {
+            Serial.println("LoRaWAN not used");
+        }
         Serial.println("========================================");
+
+        lorawan.onJoined([]()
+        {
+            Serial.println("LoRaWAN : Join reussi !");
+        });
+
+        lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
+        {
+            Serial.printf("Downlink recu sur port %d\n", port);
+        });
     }
     #endif
 
@@ -124,19 +172,6 @@ void setup()
         }
     }
 
-    if (failedSensors == 0)
-    {
-        statusLED.setState(StatusLED::State::OK);
-    }
-    else if (failedSensors < sensorCount)
-    {
-        statusLED.setState(StatusLED::State::WARNING_COMMUNICATION);
-    }
-    else
-    {
-        statusLED.setState(StatusLED::State::ERROR);
-    }
-
     #if DEBUG_ENABLE
     for (uint8_t addr = 1; addr < 127; addr++)
     {
@@ -154,6 +189,11 @@ void setup()
 void loop()
 {
     unsigned long now = millis();
+
+    if (lorawan.isInitialized())
+    {
+        lorawan.loop();
+    }
 
     // Task executed every 100 ms
     if (now - last100Ms >= TASK_100_MS)
@@ -177,8 +217,15 @@ void loop()
         
         clearMeasurement(measurement);
         bool successR = readSensors(measurement);  
-        bool successB = sendBluetooth(measurement);
-        updateStatus(successR, successB);
+
+        uint8_t buffer[BUFFER_SIZE];
+        size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
+
+        bool successB = sendBluetooth(buffer, dataSize);
+        bool successL = lorawan.isInitialized() && lorawan.isJoined();
+        // bool successL = sendLoRaWAN(buffer, dataSize); géré automatiquement par setAutoUplinkInterval
+        
+        updateStatus(successR, successB, successL);
     }
 }
 
@@ -206,30 +253,30 @@ bool readSensors(Measurement& measurement)
     return success;
 }
 
-bool sendBluetooth(const Measurement& measurement)
+bool sendBluetooth(const uint8_t* buffer, size_t dataSize)
 {
-    bool success = true;
-    uint8_t buffer[BUFFER_SIZE];
-    size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
-
-    if (dataSize > 0 && bluetooth.isInitialized() && bluetooth.hasConnectedClient())
+    if (!bluetooth.isInitialized() || dataSize == 0)
     {
-        success = bluetooth.send(buffer, dataSize);
-
-        #if DEBUG_ENABLE
-        if (success)
-        {
-            Serial.println("Data sent over Bluetooth.");
-        }
-        #endif
+        return false; // vraie erreur
     }
+
+    if (!bluetooth.hasConnectedClient())
+    {
+        return true; // pas d'erreur, juste personne de connecté
+    }
+
+    bool success = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
+
+    #if DEBUG_ENABLE
+    if (success) Serial.println("Data sent over Bluetooth.");
+    #endif
 
     return success;
 }
 
-void updateStatus(bool sensorsOK, bool bluetoothOK)
+void updateStatus(bool sensorsOK, bool bluetoothOK, bool lorawanOK)
 {
-    if (!sensorsOK && !bluetoothOK)
+    if (!sensorsOK && !bluetoothOK && !lorawanOK)
     {
         statusLED.setState(StatusLED::State::ERROR);
     }
@@ -237,7 +284,7 @@ void updateStatus(bool sensorsOK, bool bluetoothOK)
     {
         statusLED.setState(StatusLED::State::WARNING_SENSOR);
     }
-    else if (!bluetoothOK)
+    else if (!bluetoothOK || !lorawanOK)
     {
         statusLED.setState(StatusLED::State::WARNING_COMMUNICATION);
     }
@@ -246,3 +293,24 @@ void updateStatus(bool sensorsOK, bool bluetoothOK)
         statusLED.setState(StatusLED::State::OK);
     }
 }
+
+/*bool sendLoRaWAN(const uint8_t* buffer, size_t dataSize)
+{
+    if (!lorawan.isInitialized() || dataSize == 0)
+    {
+        return false; // vraie erreur
+    }
+
+    if (!lorawan.isJoined() || lorawan.isTxPending())
+    {
+        return true; // pas d'erreur, join en cours ou TX occupé
+    }
+
+    bool success = lorawan.send(const_cast<uint8_t*>(buffer), dataSize);
+
+    #if DEBUG_ENABLE
+    if (success) Serial.println("Data sent over LoRaWAN.");
+    #endif
+
+    return success;
+}*/
