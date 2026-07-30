@@ -4,6 +4,8 @@
 #include <Wire.h>
 #include "../sensor.hpp"
 
+//TODO: Calibrer le capteur ?? Les ppm semblent haute (2500 dans ma chambre)
+
 class SCD41Sensor : public Sensor
 {
     private:
@@ -44,28 +46,22 @@ inline bool SCD41Sensor::begin()
 
 inline bool SCD41Sensor::read(Measurement& m)
 {
-    // TODO: Si le capteur est débranché on rentre quand meme dans le !dataReady, il faudait aller dans if de l'erreur
     uint16_t co2;
     float temperature;
     float humidity;
 
-    bool dataReady = false;
-    sensor.getDataReadyStatus(dataReady);
-    if (!dataReady)
+    int16_t error = sensor.readMeasurement(co2, temperature, humidity);
+
+    if (error == 527)   
     {
+        // Pas de nouvelle mesure, on renvoie les dernières valeurs
         m.co2 = lastCO2;
         m.temperature = lastTemperature;
         m.humidity = lastHumidity;
         return true;
     }
 
-    int16_t error = sensor.readMeasurement(
-        co2,
-        temperature,
-        humidity
-    );
-    
-    if (error != 0)
+    if (error != 0) 
     {
         return false;
     }
@@ -74,7 +70,7 @@ inline bool SCD41Sensor::read(Measurement& m)
     m.temperature = lastTemperature = temperature;
     m.humidity = lastHumidity = humidity;
 
-    return true;    
+    return true;
 }
 
 inline const char* SCD41Sensor::displayValue(const Measurement& m) const

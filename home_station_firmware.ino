@@ -73,7 +73,6 @@ void setup()
     statusLED.update(); 
     screen.begin();
     screenButton.begin();
-    storage.begin("HomeStation", false);
 
     LoRaWANCommunication::RadioPins loraWANPins = {
         .nss  = SPI_NSS_PIN,
@@ -85,6 +84,7 @@ void setup()
     uint8_t appEui[8];
     uint8_t devEui[8];
     uint8_t appKey[16];
+    storage.begin("HomeStation", false);
     checkResetCredentialsOnBoot(storage);
     checkAndInitCredentials(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
     checkAndInitCredentials(storage, "appEui", "App EUI", appEui, sizeof(appEui));
@@ -106,62 +106,56 @@ void setup()
     delay(500);
 
     #if DEBUG_ENABLE
+    Serial.println("========  HomeStation Firmware  ========");
+    Serial.print("Number of sensors: ");
+    Serial.println(sensorCount);
+
+    if (bluetooth.isInitialized())
     {
-        Serial.println("========  HomeStation Firmware  ========");
-        Serial.print("Number of sensors: ");
-        Serial.println(sensorCount);
-
-        if (bluetooth.isInitialized())
-        {
-            Serial.println("Bluetooth used.");
-        }
-        else
-        {
-            Serial.println("Bluetooth not used");
-        }
-
-        // if (wifi.isConnected())
-        // {
-        //     Serial.println("WiFi used.");
-        // }
-        // else
-        // {
-        //     Serial.println("WiFi not used");
-        // }
-
-        if (lorawan.isInitialized())
-        {
-            Serial.println("LoRaWAN used.");
-        }
-        else
-        {
-            Serial.println("LoRaWAN not used");
-        }
-        Serial.println("========================================");
-
-        lorawan.onJoined([]()
-        {
-            Serial.println("LoRaWAN : Join reussi !");
-        });
-
-        lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
-        {
-            Serial.printf("Downlink recu sur port %d\n", port);
-        });
+        Serial.println("Bluetooth used.");
     }
-    #endif
+    else
+    {
+        Serial.println("Bluetooth not used");
+    }
 
-    int failedSensors = 0;
+    // if (wifi.isConnected())
+    // {
+    //     Serial.println("WiFi used.");
+    // }
+    // else
+    // {
+    //     Serial.println("WiFi not used");
+    // }
+
+    if (lorawan.isInitialized())
+    {
+        Serial.println("LoRaWAN used.");
+    }
+    else
+    {
+        Serial.println("LoRaWAN not used");
+    }
+    Serial.println("========================================");
+
+    lorawan.onJoined([]()
+    {
+        Serial.println("LoRaWAN : Join reussi !");
+    });
+
+    lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
+    {
+        Serial.printf("Downlink recu sur port %d\n", port);
+    });
+
     for(int i = 0; i < sensorCount; i++)
     {
         if(!sensors[i]->begin())
         {
-            failedSensors++;
             #if DEBUG_ENABLE
                 Serial.print("Error: Initialization failed for sensor: ");
                 Serial.println(sensors[i]->getName());
             #endif
-            
         }
         else
         {
@@ -172,7 +166,6 @@ void setup()
         }
     }
 
-    #if DEBUG_ENABLE
     for (uint8_t addr = 1; addr < 127; addr++)
     {
         Wire.beginTransmission(addr);
