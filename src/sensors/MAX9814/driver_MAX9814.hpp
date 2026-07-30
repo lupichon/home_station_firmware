@@ -8,19 +8,12 @@
 class MAX9814Sensor : public Sensor
 {
     private:
-        static constexpr uint32_t TIMER_PERIOD_US = 100'000;
-        static constexpr int SOUND_THRESHOLD = 2000;
-
         int pin;
-
-        hw_timer_t* timer = nullptr;
-
-        volatile bool soundDetected = false;
-
-        static void onTimer(void* arg);
+        bool soundDetected = false;
 
     public:
         MAX9814Sensor(int pin);
+        void update();
 
         bool begin() override;
         bool read(Measurement& m) override;
@@ -36,35 +29,17 @@ inline MAX9814Sensor::MAX9814Sensor(int pin)
 inline bool MAX9814Sensor::begin()
 {
     pinMode(pin, INPUT);
-
     analogReadResolution(12);
-
-    timer = timerBegin(1000000);
-
-    if (timer == nullptr)
-    {
-        initialized = false;
-        return false;
-    }
-
-    timerAttachInterruptArg(timer, onTimer, this);
-    timerAlarm(timer, TIMER_PERIOD_US, true, 0);
 
     initialized = true;
 
     return true;
 }
 
-inline void MAX9814Sensor::onTimer(void* arg)
+inline void MAX9814Sensor::update()
 {
-    MAX9814Sensor* sensor = static_cast<MAX9814Sensor*>(arg);
-
-    int value = analogRead(sensor->pin);
-
-    if (value > SOUND_THRESHOLD)
-    {
-        sensor->soundDetected = true;
-    }
+    int soundLevel = analogRead(pin);
+    soundDetected = (soundLevel > 1000); // Adjust the threshold as needed
 }
 
 inline bool MAX9814Sensor::read(Measurement& m)

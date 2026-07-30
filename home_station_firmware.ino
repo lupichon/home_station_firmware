@@ -52,12 +52,14 @@ Sensor* sensors[] =
 int sensorCount = Sensor::getSensorCount();
 
 // Constants for task timing
+constexpr unsigned long TASK_10_MS   = 10;
 constexpr unsigned long TASK_100_MS  = 100; 
 constexpr unsigned long TASK_1000_MS = 1000; 
 
 // Timestamps for the last execution of tasks
-unsigned long last1000Ms = 0; 
+unsigned long last10Ms   = 0;
 unsigned long last100Ms  = 0;
+unsigned long last1000Ms = 0; 
 
 // Declaration of the measurement structure to hold sensor data
 Measurement measurement;
@@ -188,6 +190,13 @@ void loop()
         lorawan.loop();
     }
 
+    if (now - last10Ms >= TASK_10_MS)
+    {
+        last10Ms = now;
+
+        soundSensor.update();
+    }
+
     // Task executed every 100 ms
     if (now - last100Ms >= TASK_100_MS)
     {
@@ -216,7 +225,6 @@ void loop()
 
         bool successB = sendBluetooth(buffer, dataSize);
         bool successL = lorawan.isInitialized() && lorawan.isJoined();
-        // bool successL = sendLoRaWAN(buffer, dataSize); géré automatiquement par setAutoUplinkInterval
         
         updateStatus(successR, successB, successL);
     }
@@ -228,6 +236,8 @@ bool readSensors(Measurement& measurement)
     for(int i = 0; i < sensorCount; i++)
     {
         Sensor& sensor = *sensors[i];
+        Serial.print("Reading sensor: ");
+        Serial.println(sensor.getName());
 
         if(sensor.isInitialized())
         {
@@ -257,7 +267,6 @@ bool sendBluetooth(const uint8_t* buffer, size_t dataSize)
     {
         return true; // pas d'erreur, juste personne de connecté
     }
-
     bool success = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
 
     #if DEBUG_ENABLE
