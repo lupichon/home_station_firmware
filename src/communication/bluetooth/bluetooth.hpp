@@ -11,7 +11,7 @@
 #include "bluetooth_UUID.hpp"
 
 
-class BluetoothCommunication : public Communication
+class BluetoothCommunication : public Communication, public BLEServerCallbacks
 {
     private:
 
@@ -28,7 +28,21 @@ class BluetoothCommunication : public Communication
         bool begin();
         bool send(uint8_t* data, size_t dataSize) override;
         bool hasConnectedClient() const;
+        void onConnect(BLEServer* server) override;
+        void onDisconnect(BLEServer* server) override;
 };
+
+inline void BluetoothCommunication::onConnect(BLEServer* server)
+{
+    // Handle client connection
+    BLEServerCallbacks::onConnect(server);
+}
+
+inline void BluetoothCommunication::onDisconnect(BLEServer* server)
+{
+    BLEServerCallbacks::onDisconnect(server);
+    BLEDevice::startAdvertising(); // Restart advertising when a client disconnects
+}
 
 
 // ============================================================
@@ -68,11 +82,11 @@ inline bool BluetoothCommunication::begin()
     service = server->createService(
         BluetoothUUID::SERVICE
     );
-
     if (service == nullptr)
     {
         return false;
     }
+    server->setCallbacks(this);
 
 
     // Create measurement characteristic
