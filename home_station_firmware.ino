@@ -3,6 +3,7 @@
 #include "src/core/measurement.hpp"
 #include "src/core/pins.hpp"
 #include "src/core/storage.hpp"
+#include "src/core/configuration_handler.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
 #include "src/sensors/SCD41/driver_SCD41.hpp"
@@ -12,7 +13,6 @@
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
 #include "src/communication/LoRaWAN/lorawan.hpp"
-#include "src/communication/LoRaWAN/credentials_handler.hpp"
 #include "src/interface/status_led.hpp"
 #include "src/interface/display_SSD1306.hpp"
 #include "src/interface/button.hpp"
@@ -24,7 +24,7 @@ Storage storage;
 
 // Declaration of communcation interfaces
 extern HardwareSerial Serial;
-BluetoothCommunication bluetooth("HomeStation");
+BluetoothCommunication bluetooth;
 //WiFiCommunication wifi("your_ssid", "your_password");
 
 // Declaration of elements for the interface with the user (LEDs, buttons, screens, etc.)
@@ -86,13 +86,21 @@ void setup()
     uint8_t appEui[8];
     uint8_t devEui[8];
     uint8_t appKey[16];
+    String bleDeviceName;
+    String serviceUUID;
+    String characteristicUUID;
+
     storage.begin("HomeStation", false);
-    checkResetCredentialsOnBoot(storage);
-    checkAndInitCredentials(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
-    checkAndInitCredentials(storage, "appEui", "App EUI", appEui, sizeof(appEui));
-    checkAndInitCredentials(storage, "appKey", "App Key", appKey, sizeof(appKey));
+    checkConfigResetOnBoot(storage);
+    loadOrCreateConfig(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
+    loadOrCreateConfig(storage, "appEui", "App EUI", appEui, sizeof(appEui));
+    loadOrCreateConfig(storage, "appKey", "App Key", appKey, sizeof(appKey));
+    loadOrCreateConfig(storage, "bleName", "BLE Device Name", bleDeviceName, 31, false);
+    loadOrCreateConfig(storage, "serUUID", "Service UUID", serviceUUID, 36);
+    loadOrCreateConfig(storage, "charUUID", "Characteristic UUID", characteristicUUID, 36);
     storage.end();
 
+    bluetooth = BluetoothCommunication(bleDeviceName, serviceUUID, characteristicUUID);
     lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);
     lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
     {
@@ -138,7 +146,6 @@ void setup()
     {
         Serial.println("LoRaWAN not used");
     }
-    Serial.println("========================================");
 
     lorawan.onJoined([]()
     {
@@ -173,10 +180,41 @@ void setup()
         Wire.beginTransmission(addr);
         if (Wire.endTransmission() == 0)
         {
-            Serial.print("Périphérique trouvé à 0x");
+            Serial.print("(I2C) Found peripheral at 0x");
             Serial.println(addr, HEX);
         }
     }
+
+    Serial.println("Configuration used : ");
+    Serial.print("devEui: ");
+    for (int i = 0; i < 8; i++)
+    {
+        Serial.print(devEui[i], HEX);
+        if (i < 7) Serial.print(":");
+    }
+    Serial.println();
+    Serial.print("appEui: ");
+    for (int i = 0; i < 8; i++)
+    {
+        Serial.print(appEui[i], HEX);
+        if (i < 7) Serial.print(":");
+    }
+    Serial.println();
+    Serial.print("appKey: ");
+    for (int i = 0; i < 16; i++)
+    {
+        Serial.print(appKey[i], HEX);
+        if (i < 15) Serial.print(":");
+    }
+    Serial.println();
+    Serial.print("bleDeviceName: ");
+    Serial.println(bleDeviceName);
+    Serial.print("serviceUUID: ");
+    Serial.println(serviceUUID);
+    Serial.print("characteristicUUID: ");
+    Serial.println(characteristicUUID);
+
+    Serial.println("========================================");
     #endif
 }
 

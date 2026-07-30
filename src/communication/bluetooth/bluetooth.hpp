@@ -8,14 +8,15 @@
 #include <BLE2902.h>
 
 #include "../communication.hpp"
-#include "bluetooth_UUID.hpp"
 
 
 class BluetoothCommunication : public Communication, public BLEServerCallbacks
 {
     private:
 
-        const char* deviceName;
+        String deviceName;
+        String serviceUUID; 
+        String characteristicUUID;
 
         BLEServer* server;
         BLEService* service;
@@ -23,7 +24,8 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks
 
     public:
 
-        BluetoothCommunication(const char* name);
+        BluetoothCommunication() = default;
+        BluetoothCommunication(const String& name, const String& serviceUUID, const String& characteristicUUID);
 
         bool begin();
         bool send(uint8_t* data, size_t dataSize) override;
@@ -49,8 +51,10 @@ inline void BluetoothCommunication::onDisconnect(BLEServer* server)
 // Constructor
 // ============================================================
 
-inline BluetoothCommunication::BluetoothCommunication(const char* name)
+inline BluetoothCommunication::BluetoothCommunication(const String& name, const String& serviceUUID, const String& characteristicUUID)
     : deviceName(name),
+      serviceUUID(serviceUUID),
+      characteristicUUID(characteristicUUID),
       server(nullptr),
       service(nullptr),
       measurementCharacteristic(nullptr),
@@ -66,75 +70,36 @@ inline BluetoothCommunication::BluetoothCommunication(const char* name)
 
 inline bool BluetoothCommunication::begin()
 {
-    BLEDevice::init(deviceName);
-
-
-    // Create BLE server
+    BLEDevice::init(deviceName.c_str());
+    
     server = BLEDevice::createServer();
+    if (server == nullptr) return false;
 
-    if (server == nullptr)
-    {
-        return false;
-    }
+    service = server->createService(BLEUUID(serviceUUID.c_str()));
+    if (service == nullptr) return false;
 
-
-    // Create HomeStation service
-    service = server->createService(
-        BluetoothUUID::SERVICE
-    );
-    if (service == nullptr)
-    {
-        return false;
-    }
     server->setCallbacks(this);
 
-
-    // Create measurement characteristic
-    measurementCharacteristic =
-        service->createCharacteristic(
-            BluetoothUUID::MEASUREMENT,
-            BLECharacteristic::PROPERTY_READ |
-            BLECharacteristic::PROPERTY_NOTIFY
-        );
-
-
-    if (measurementCharacteristic == nullptr)
-    {
-        return false;
-    }
-
-
-    // Enable notifications
-    measurementCharacteristic->addDescriptor(
-        new BLE2902()
+    Serial.println("BLE: create characteristic");
+    measurementCharacteristic = service->createCharacteristic(
+        BLEUUID(characteristicUUID.c_str()),
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_NOTIFY
     );
+    if (measurementCharacteristic == nullptr) return false;
 
+    measurementCharacteristic->addDescriptor(new BLE2902());
 
-    // Start BLE service
     service->start();
 
-
-    // Start advertising
-    BLEAdvertising* advertising =
-        BLEDevice::getAdvertising();
-
-    advertising->addServiceUUID(
-        BluetoothUUID::SERVICE
-    );
-
+    BLEAdvertising* advertising = BLEDevice::getAdvertising();
+    advertising->addServiceUUID(BLEUUID(serviceUUID.c_str()));
     advertising->setScanResponse(true);
-
     advertising->setMinPreferred(0x06);
     advertising->setMinPreferred(0x12);
-
-    //advertising->setMinInterval(16000);
-    //advertising->setMaxInterval(16000);
-
     BLEDevice::startAdvertising();
 
-
     initialized = true;
-
     return true;
 }
 
