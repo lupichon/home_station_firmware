@@ -12,7 +12,8 @@ class SCD41Sensor : public Sensor
         SensirionI2cScd4x sensor;
         float lastTemperature = NAN;
         float lastHumidity = NAN;
-        float lastCO2 = NAN;
+        uint16_t lastCO2 = NAN;
+        int noDataCount = 0;
 
     public:
         SCD41Sensor();
@@ -55,6 +56,12 @@ inline bool SCD41Sensor::read(Measurement& m)
     if (error == 527)   
     {
         // Pas de nouvelle mesure, on renvoie les dernières valeurs
+        noDataCount++;
+        if (noDataCount > 20)
+        {
+            return false;
+        }
+
         m.co2 = lastCO2;
         m.temperature = lastTemperature;
         m.humidity = lastHumidity;
@@ -66,6 +73,7 @@ inline bool SCD41Sensor::read(Measurement& m)
         return false;
     }
 
+    noDataCount = 0;
     m.co2 = lastCO2 = co2;
     m.temperature = lastTemperature = temperature;
     m.humidity = lastHumidity = humidity;

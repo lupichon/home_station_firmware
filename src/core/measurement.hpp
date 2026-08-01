@@ -6,7 +6,7 @@ struct Measurement
 {
     float temperature = NAN;
     float humidity    = NAN;
-    float co2         = NAN;
+    uint16_t co2      = NAN;
     float luminosity  = NAN;
     bool  motion      = false;
     bool  sound       = false;
