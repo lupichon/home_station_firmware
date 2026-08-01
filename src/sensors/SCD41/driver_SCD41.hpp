@@ -10,10 +10,10 @@ class SCD41Sensor : public Sensor
 {
     private:
         SensirionI2cScd4x sensor;
-        float lastTemperature = NAN;
-        float lastHumidity = NAN;
-        uint16_t lastCO2 = NAN;
-        int noDataCount = 0;
+        float lastTemperature;
+        float lastHumidity;
+        uint16_t lastCO2;
+        unsigned long lastSuccessfulReadTime;
 
     public:
         SCD41Sensor();
@@ -25,7 +25,7 @@ class SCD41Sensor : public Sensor
 
 
 inline SCD41Sensor::SCD41Sensor()
-    : Sensor("SCD41")
+    : Sensor("SCD41"), lastTemperature(NAN), lastHumidity(NAN), lastCO2(NAN), lastSuccessfulReadTime(millis())
 {
 }
 
@@ -47,37 +47,44 @@ inline bool SCD41Sensor::begin()
 
 inline bool SCD41Sensor::read(Measurement& m)
 {
-    uint16_t co2;
-    float temperature;
-    float humidity;
+    bool dataReady = false;
+    uint16_t error = sensor.getDataReadyStatus(dataReady);
 
-    int16_t error = sensor.readMeasurement(co2, temperature, humidity);
-
-    if (error == 527)   
-    {
-        // Pas de nouvelle mesure, on renvoie les dernières valeurs
-        noDataCount++;
-        if (noDataCount > 20)
-        {
-            return false;
-        }
-
-        m.co2 = lastCO2;
-        m.temperature = lastTemperature;
-        m.humidity = lastHumidity;
-        return true;
-    }
-
-    if (error != 0) 
+    if (error != 0)
     {
         return false;
     }
 
-    noDataCount = 0;
-    m.co2 = lastCO2 = co2;
-    m.temperature = lastTemperature = temperature;
-    m.humidity = lastHumidity = humidity;
+    if (!dataReady)
+    {
+        if (millis() - lastSuccessfulReadTime > 30000)
+        {
+            return false; // Trop longtemps sans données
+            // A voir plus tard si il faut reset le capteur
+        }
 
+        m.co2         = lastCO2;
+        m.temperature = lastTemperature;
+        m.humidity    = lastHumidity;
+        return true;
+    }
+
+    // dataReady == true
+    uint16_t co2      = 0;
+    float temperature = 0.0f;
+    float humidity    = 0.0f;
+
+    error = sensor.readMeasurement(co2, temperature, humidity);
+
+    if (error != 0)
+    {
+        return false;
+    }
+
+    m.co2         = lastCO2         = co2;
+    m.temperature = lastTemperature = temperature;
+    m.humidity    = lastHumidity    = humidity;
+    lastSuccessfulReadTime          = millis();
     return true;
 }
 
@@ -88,7 +95,7 @@ inline const char* SCD41Sensor::displayValue(const Measurement& m) const
     snprintf(
         buffer,
         sizeof(buffer),
-        "%s: CO2=%.0f ppm | Temp=%.2f C | Hum=%.2f %%",
+        "%s: CO2=%u ppm | Temp=%.2f C | Hum=%.2f %%",
         getName(),
         m.co2,
         m.temperature,
