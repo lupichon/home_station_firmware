@@ -18,7 +18,8 @@ class DisplaySSD1306
             LUMINOSITY,
             MOTION, 
             SOUND, 
-            OBSTACLE
+            OBSTACLE,
+            VIBRATION
         };
 
         static constexpr uint8_t WIDTH = 128;
@@ -47,7 +48,10 @@ class DisplaySSD1306
         void displayMotion(bool detected);
         void displaySound(bool detected);
         void displayObstacle(bool detected);
+        void displayVibration(bool detected);
         void displayTitle(const char* title);
+        void displayValue(String title, String unit, int precision, float value);
+        void displayValue(String title, String textIfDetected, String textIfNotDetected, bool detected);
 
         void sleep();
         void wake();
@@ -126,6 +130,9 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
         case Page::OBSTACLE:
             displayObstacle(measurement.obstacle);
             break;
+        case Page::VIBRATION:
+            displayVibration(measurement.vibration);
+            break;
     }
 
     screen.display();
@@ -162,9 +169,12 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::OBSTACLE:
-            currentPage = Page::TEMPERATURE;
+            currentPage = Page::VIBRATION;
             break;
 
+        case Page::VIBRATION:
+            currentPage = Page::TEMPERATURE;
+            break;
     }
 }
 
@@ -184,10 +194,9 @@ inline void DisplaySSD1306::displayTitle(const char* title)
     );
 }
 
-
-inline void DisplaySSD1306::displayTemperature(float value)
+inline void DisplaySSD1306::displayValue(String title, String unit, int precision, float value)
 {
-    displayTitle("Temperature");
+    displayTitle(title.c_str());
 
     screen.setTextSize(2);
     screen.setCursor(0, 25);
@@ -198,117 +207,71 @@ inline void DisplaySSD1306::displayTemperature(float value)
     }
     else
     {
-        screen.print(value, 1);
-        screen.println(" C");
+        screen.print(value, precision);
+        screen.print(" ");
+        screen.println(unit);
     }
+}
+
+inline void DisplaySSD1306::displayValue(String title, String textIfDetected, String textIfNotDetected, bool detected)
+{
+    displayTitle(title.c_str());
+
+    screen.setTextSize(2);
+    screen.setCursor(0, 25);
+
+    if (detected)
+    {
+        screen.println(textIfDetected);
+    }
+    else
+    {
+        screen.println(textIfNotDetected);
+    }
+}
+
+
+inline void DisplaySSD1306::displayTemperature(float value)
+{
+    displayValue("Temperature", " C", 1, value);
 }
 
 
 inline void DisplaySSD1306::displayHumidity(float value)
 {
-    displayTitle("Humidity");
-
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (isnan(value))
-    {
-        screen.println("N/A");
-    }
-    else
-    {
-        screen.print(value, 1);
-        screen.println(" %");
-    }
+    displayValue("Humidity", "%", 1, value);
 }
 
 inline void DisplaySSD1306::displayCO2(float value)
 {
-    displayTitle("CO2");
-
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (isnan(value))
-    {
-        screen.println("N/A");
-    }
-    else
-    {
-        screen.print(value, 0);
-        screen.println(" ppm");
-    }
+    displayValue("CO2", "ppm", 0, value);
 }
 
 
 inline void DisplaySSD1306::displayLuminosity(float value)
 {
-    displayTitle("Luminosity");
-
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (isnan(value))
-    {
-        screen.println("N/A");
-    }
-    else
-    {
-        screen.print(value, 1);
-        screen.println(" lx");
-    }
+    displayValue("Luminosity", "lux", 0, value);
 }
 
 
 inline void DisplaySSD1306::displayMotion(bool detected)
 {
-    displayTitle("Motion");
-
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (detected)
-    {
-        screen.println("DETECTED");
-    }
-    else
-    {
-        screen.println("NONE");
-    }
+    displayValue("Motion", "DETECTED", "NONE", detected);
 }
 
 inline void DisplaySSD1306::displaySound(bool detected)
 {
-    displayTitle("Sound");
-
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (detected)
-    {
-        screen.println("DETECTED");
-    }
-    else
-    {
-        screen.println("NONE");
-    }
+    displayValue("Sound", "DETECTED", "QUIET", detected);
 }
 
 inline void DisplaySSD1306::displayObstacle(bool detected)
 {
-    displayTitle("Obstacle");
+    displayValue("Obstacle", "DETECTED", "NONE", detected);
+}
 
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
-
-    if (detected)
-    {
-        screen.println("DETECTED");
-    }
-    else
-    {
-        screen.println("NONE");
-    }
+inline void DisplaySSD1306::displayVibration(bool detected)
+{
+    displayValue("Vibration", "DETECTED", "NONE", detected);
 }
 
 inline bool DisplaySSD1306::isSleeping() const

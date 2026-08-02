@@ -36,6 +36,7 @@ size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t bufferS
     flags |= (measurement.motion   ? 1 : 0) << 0;
     flags |= (measurement.sound    ? 1 : 0) << 1;
     flags |= (measurement.obstacle ? 1 : 0) << 2;
+    flags |= (measurement.vibration ? 1 : 0) << 3;
 
     buffer[offset] = flags;
     offset += sizeof(uint8_t);

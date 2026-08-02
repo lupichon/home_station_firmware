@@ -11,6 +11,7 @@ struct Measurement
     bool  motion      = false;
     bool  sound       = false;
     bool  obstacle    = false;
+    bool vibration    = false;
 };
 
 void clearMeasurement(Measurement& measurement)
@@ -22,4 +23,5 @@ void clearMeasurement(Measurement& measurement)
     measurement.motion      = false;
     measurement.sound       = false;
     measurement.obstacle    = false;
+    measurement.vibration   = false;
 }

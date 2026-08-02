@@ -9,6 +9,7 @@
 #include "src/sensors/SCD41/driver_SCD41.hpp"
 #include "src/sensors/MAX9814/driver_MAX9814.hpp"
 #include "src/sensors/FC-51/driver_FC-51.hpp"
+#include "src/sensors/SW-420/driver_SW-420.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
@@ -38,6 +39,7 @@ HCSR501Sensor motionSensor(HC_SR501_PIN);    // Motion sensor
 SCD41Sensor   co2TempHumiSensor;             // CO2, temperature and humidity sensor
 MAX9814Sensor soundSensor(MAX9814_PIN);      // Sound sensor
 FC51Sensor    obstacleSensor(FC_51_PIN);     // Obstacle sensor
+SW420Sensor   vibrationSensor(SW_420_PIN);      // Vibration sensor
 
 // Array of pointers to the sensors used in the project
 Sensor* sensors[] =
@@ -46,7 +48,8 @@ Sensor* sensors[] =
     &motionSensor,
     &co2TempHumiSensor,
     &soundSensor,
-    &obstacleSensor
+    &obstacleSensor,
+    &vibrationSensor
 };
 
 int sensorCount = Sensor::getSensorCount();
