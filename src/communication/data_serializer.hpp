@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "../core/measurement.hpp"
+#include "../core/gas_state.hpp"
 
 constexpr size_t NB_FLOATS    = 3;
 constexpr size_t NB_UINT16    = 1;
@@ -37,6 +38,7 @@ size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t bufferS
     flags |= (measurement.sound    ? 1 : 0) << 1;
     flags |= (measurement.obstacle ? 1 : 0) << 2;
     flags |= (measurement.vibration ? 1 : 0) << 3;
+    flags |= (static_cast<uint8_t>(gasStateFromRaw(measurement.gasRaw)) & 0x03) << 4;
 
     buffer[offset] = flags;
     offset += sizeof(uint8_t);

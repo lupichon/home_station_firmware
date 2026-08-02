@@ -6,6 +6,7 @@
 #include <Adafruit_SSD1306.h>
 
 #include "../core/measurement.hpp"
+#include "../core/gas_state.hpp"
 
 class DisplaySSD1306
 {
@@ -15,6 +16,7 @@ class DisplaySSD1306
             TEMPERATURE,
             HUMIDITY,
             CO2,
+            GASLEVEL,
             LUMINOSITY,
             MOTION, 
             SOUND, 
@@ -43,7 +45,8 @@ class DisplaySSD1306
 
         void displayTemperature(float value);
         void displayHumidity(float value);
-        void displayCO2(float value);
+        void displayCO2(uint16_t value);
+        void displayGasLevel(uint16_t value);
         void displayLuminosity(float value);
         void displayMotion(bool detected);
         void displaySound(bool detected);
@@ -130,8 +133,13 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
         case Page::OBSTACLE:
             displayObstacle(measurement.obstacle);
             break;
+
         case Page::VIBRATION:
             displayVibration(measurement.vibration);
+            break;
+
+        case Page::GASLEVEL:
+            displayGasLevel(measurement.gasRaw);
             break;
     }
 
@@ -152,9 +160,12 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::CO2:
-            currentPage = Page::LUMINOSITY;
+            currentPage = Page::GASLEVEL;
             break;
 
+        case Page::GASLEVEL:
+            currentPage = Page::LUMINOSITY;
+            break;
 
         case Page::LUMINOSITY:
             currentPage = Page::MOTION;
@@ -242,11 +253,18 @@ inline void DisplaySSD1306::displayHumidity(float value)
     displayValue("Humidity", "%", 1, value);
 }
 
-inline void DisplaySSD1306::displayCO2(float value)
+inline void DisplaySSD1306::displayCO2(uint16_t value)
 {
     displayValue("CO2", "ppm", 0, value);
 }
 
+inline void DisplaySSD1306::displayGasLevel(uint16_t raw)
+{
+    GasState state = gasStateFromRaw(raw);
+    const char* stateStr = gasStateToString(state);
+
+    displayValue("Gas Level", stateStr, 0, raw);
+}
 
 inline void DisplaySSD1306::displayLuminosity(float value)
 {
