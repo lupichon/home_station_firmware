@@ -22,7 +22,9 @@ class DisplaySSD1306
             SOUND, 
             OBSTACLE,
             VIBRATION,
-            PRESSURE
+            PRESSURE, 
+            VOC,
+            NOX
         };
 
         static constexpr uint8_t WIDTH = 128;
@@ -47,6 +49,8 @@ class DisplaySSD1306
         void displayTemperature(float value);
         void displayHumidity(float value);
         void displayCO2(uint16_t value);
+        void displayVocIndex(uint16_t value);
+        void displayNoxIndex(uint16_t value);
         void displayGasLevel(uint16_t value);
         void displayLuminosity(float value);
         void displayPressure(float value);
@@ -128,6 +132,14 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
             displayPressure(measurement.pressure);
             break;
 
+        case Page::VOC:
+            displayVocIndex(measurement.vocIndex);
+            break;
+
+        case Page::NOX:
+            displayNoxIndex(measurement.noxIndex);
+            break;
+
         case Page::MOTION:
             displayMotion(measurement.motion);
             break;
@@ -166,6 +178,14 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::CO2:
+            currentPage = Page::VOC;
+            break;
+
+        case Page::VOC:
+            currentPage = Page::NOX;
+            break;
+
+        case Page::NOX:
             currentPage = Page::GASLEVEL;
             break;
 
@@ -281,6 +301,15 @@ inline void DisplaySSD1306::displayLuminosity(float value)
     displayValue("Luminosity", "lux", 0, value);
 }
 
+inline void DisplaySSD1306::displayVocIndex(uint16_t value)
+{
+    displayValue("VOC", "", 0, value);
+}
+
+inline void DisplaySSD1306::displayNoxIndex(uint16_t value)
+{
+    displayValue("NOx", "", 0, value);
+}
 
 inline void DisplaySSD1306::displayMotion(bool detected)
 {

@@ -5,6 +5,8 @@
 #include <Adafruit_BMP280.h>
 #include "../sensor.hpp"
 
+//TODO: A TESTER
+
 class BMP280Sensor : public Sensor
 {
 private:

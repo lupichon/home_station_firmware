@@ -12,6 +12,7 @@
 #include "src/sensors/SW-420/driver_SW-420.hpp"
 #include "src/sensors/MQ-2/driver_MQ-2.hpp"
 #include "src/sensors/BMP280/driver_BMP280.hpp"
+#include "src/sensors/SGP41/driver_SGP41.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
@@ -44,6 +45,8 @@ FC51Sensor    obstacleSensor(FC_51_PIN);     // Obstacle sensor
 SW420Sensor   vibrationSensor(SW_420_PIN);      // Vibration sensor
 MQ2Sensor     gasSensor(MQ2_PIN);               // Gas sensor
 BMP280Sensor  pressureSensor;                    // Pressure sensor
+SGP41Sensor   VocNoxSensor;                  // Air quality sensor (VOC and NOx)
+
 
 // Array of pointers to the sensors used in the project
 Sensor* sensors[] =
@@ -55,7 +58,8 @@ Sensor* sensors[] =
     &obstacleSensor,
     &vibrationSensor,
     &gasSensor,
-    &pressureSensor
+    &pressureSensor,
+    &VocNoxSensor       // Important: this sensor must be placed after the SCD41 (it needs temp and humidity)
 };
 
 int sensorCount = Sensor::getSensorCount();
