@@ -11,6 +11,7 @@
 #include "src/sensors/FC-51/driver_FC-51.hpp"
 #include "src/sensors/SW-420/driver_SW-420.hpp"
 #include "src/sensors/MQ-2/driver_MQ-2.hpp"
+#include "src/sensors/BMP280/driver_BMP280.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
 //#include "src/communication/wifi/wifi.hpp"
@@ -42,6 +43,7 @@ MAX9814Sensor soundSensor(MAX9814_PIN);      // Sound sensor
 FC51Sensor    obstacleSensor(FC_51_PIN);     // Obstacle sensor
 SW420Sensor   vibrationSensor(SW_420_PIN);      // Vibration sensor
 MQ2Sensor     gasSensor(MQ2_PIN);               // Gas sensor
+BMP280Sensor  pressureSensor;                    // Pressure sensor
 
 // Array of pointers to the sensors used in the project
 Sensor* sensors[] =
@@ -52,7 +54,8 @@ Sensor* sensors[] =
     &soundSensor,
     &obstacleSensor,
     &vibrationSensor,
-    &gasSensor
+    &gasSensor,
+    &pressureSensor
 };
 
 int sensorCount = Sensor::getSensorCount();
@@ -280,8 +283,6 @@ bool readSensors(Measurement& measurement)
     for(int i = 0; i < sensorCount; i++)
     {
         Sensor& sensor = *sensors[i];
-        Serial.print("Reading sensor: ");
-        Serial.println(sensor.getName());
 
         if(sensor.isInitialized())
         {

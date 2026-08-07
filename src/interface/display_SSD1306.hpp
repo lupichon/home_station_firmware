@@ -21,7 +21,8 @@ class DisplaySSD1306
             MOTION, 
             SOUND, 
             OBSTACLE,
-            VIBRATION
+            VIBRATION,
+            PRESSURE
         };
 
         static constexpr uint8_t WIDTH = 128;
@@ -48,6 +49,7 @@ class DisplaySSD1306
         void displayCO2(uint16_t value);
         void displayGasLevel(uint16_t value);
         void displayLuminosity(float value);
+        void displayPressure(float value);
         void displayMotion(bool detected);
         void displaySound(bool detected);
         void displayObstacle(bool detected);
@@ -121,6 +123,10 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
         case Page::LUMINOSITY:
             displayLuminosity(measurement.luminosity);
             break;
+            
+        case Page::PRESSURE:
+            displayPressure(measurement.pressure);
+            break;
 
         case Page::MOTION:
             displayMotion(measurement.motion);
@@ -168,6 +174,10 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::LUMINOSITY:
+            currentPage = Page::PRESSURE;
+            break;
+
+        case Page::PRESSURE:
             currentPage = Page::MOTION;
             break;
 
@@ -290,6 +300,11 @@ inline void DisplaySSD1306::displayObstacle(bool detected)
 inline void DisplaySSD1306::displayVibration(bool detected)
 {
     displayValue("Vibration", "DETECTED", "NONE", detected);
+}
+
+inline void DisplaySSD1306::displayPressure(float value)
+{
+    displayValue("Pressure", "hPa", 1, value);
 }
 
 inline bool DisplaySSD1306::isSleeping() const

@@ -5,7 +5,7 @@
 #include "../core/measurement.hpp"
 #include "../core/gas_state.hpp"
 
-constexpr size_t NB_FLOATS    = 3;
+constexpr size_t NB_FLOATS    = 4;
 constexpr size_t NB_UINT16    = 1;
 constexpr size_t NB_FLAG_BYTE = 1;
 constexpr size_t BUFFER_SIZE = (sizeof(float) * NB_FLOATS)
@@ -30,6 +30,9 @@ size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t bufferS
     memcpy(buffer + offset, &measurement.luminosity, sizeof(float));
     offset += sizeof(float);
     
+    memcpy(buffer + offset, &measurement.pressure, sizeof(float));
+    offset += sizeof(float);
+
     memcpy(buffer + offset, &measurement.co2, sizeof(uint16_t));
     offset += sizeof(uint16_t);
 
