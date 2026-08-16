@@ -7,12 +7,14 @@
 
 #include "../core/measurement.hpp"
 #include "../core/gas_state.hpp"
+#include "../core/clock.hpp"
 
 class DisplaySSD1306
 {
     public:
         enum class Page
         {
+            CLOCK,
             TEMPERATURE,
             HUMIDITY,
             CO2,
@@ -32,7 +34,7 @@ class DisplaySSD1306
         static constexpr uint8_t I2C_ADDRESS = 0x3C;
         static constexpr unsigned long SLEEP_TIMEOUT_MS = 60000;
 
-        DisplaySSD1306();
+        DisplaySSD1306(Clock &clock);
 
         bool begin();
         void update(const Measurement& measurement);
@@ -45,7 +47,9 @@ class DisplaySSD1306
         Page currentPage;
         bool sleeping;
         unsigned long lastActivityTime;
+        Clock &clock;
 
+        void displayClock(uint32_t epoch);
         void displayTemperature(float value);
         void displayHumidity(float value);
         void displayCO2(uint16_t value);
@@ -67,8 +71,8 @@ class DisplaySSD1306
 };
 
 
-inline DisplaySSD1306::DisplaySSD1306() : screen(WIDTH, HEIGHT, &Wire, -1),
-      currentPage(Page::TEMPERATURE), sleeping(false), lastActivityTime(0)
+inline DisplaySSD1306::DisplaySSD1306(Clock &clock) : screen(WIDTH, HEIGHT, &Wire, -1),
+      currentPage(Page::CLOCK), sleeping(false), lastActivityTime(0), clock(clock)
 {
 }
 
@@ -112,6 +116,10 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
 
     switch (currentPage)
     {
+        case Page::CLOCK: 
+            displayClock(measurement.timestamp);
+            break;
+
         case Page::TEMPERATURE:
             displayTemperature(measurement.temperature);
             break;
@@ -169,6 +177,10 @@ inline void DisplaySSD1306::nextPage()
 {
     switch (currentPage)
     {
+        case Page::CLOCK:
+            currentPage = Page::TEMPERATURE;
+            break;
+
         case Page::TEMPERATURE:
             currentPage = Page::HUMIDITY;
             break;
@@ -214,7 +226,7 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::VIBRATION:
-            currentPage = Page::TEMPERATURE;
+            currentPage = Page::CLOCK;
             break;
     }
 }
@@ -271,7 +283,30 @@ inline void DisplaySSD1306::displayValue(String title, String textIfDetected, St
     }
 }
 
+inline void DisplaySSD1306::displayClock(uint32_t epoch)
+{
+    displayTitle("Clock");
 
+    screen.setTextSize(2);
+    screen.setCursor(0, 25);
+
+    if (!clock.isSynchronized())
+    {
+        screen.println("N/A");
+        return;
+    }
+
+    char time[9];
+    snprintf(time, sizeof(time), "%02u:%02u:%02u",
+        clock.hour(epoch), clock.minute(epoch), clock.second(epoch));
+    screen.println(time);
+
+    char date[11];
+    snprintf(date, sizeof(date), "%02u/%02u/%04u",
+        clock.day(epoch), clock.month(epoch), clock.year(epoch));
+    screen.println(date);
+}
+ 
 inline void DisplaySSD1306::displayTemperature(float value)
 {
     displayValue("Temperature", " C", 1, value);

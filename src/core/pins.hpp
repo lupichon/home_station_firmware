@@ -50,3 +50,4 @@ constexpr uint8_t STATUS_LED_RED_PIN    = PIN_GPIO_25;
 constexpr uint8_t STATUS_LED_GREEN_PIN  = PIN_GPIO_26;
 constexpr uint8_t STATUS_LED_BLUE_PIN   = PIN_GPIO_27;
 constexpr uint8_t SCREEN_BUTTON_PIN     = PIN_GPIO_32;
+constexpr uint8_t BUZZER_PIN            = PIN_GPIO_13;

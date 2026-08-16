@@ -3,7 +3,9 @@
 #include "src/core/measurement.hpp"
 #include "src/core/pins.hpp"
 #include "src/core/storage.hpp"
-#include "src/core/configuration_handler.hpp"
+#include "src/core/configuration_manager.hpp"
+#include "src/core/alarm_manager.hpp"
+#include "src/core/clock.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
 #include "src/sensors/SCD41/driver_SCD41.hpp"
@@ -20,8 +22,13 @@
 #include "src/interface/status_led.hpp"
 #include "src/interface/display_SSD1306.hpp"
 #include "src/interface/button.hpp"
+#include "src/interface/buzzer.hpp"
 
 #define DEBUG_ENABLE 1
+
+constexpr const char* STORAGE_NAMESPACE = "HomeStation";
+
+Clock systemClock;
 
 // Memory handle
 Storage storage;
@@ -33,8 +40,10 @@ BluetoothCommunication bluetooth;
 
 // Declaration of elements for the interface with the user (LEDs, buttons, screens, etc.)
 StatusLED statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
-DisplaySSD1306 screen;
+DisplaySSD1306 screen(systemClock);
 Button screenButton(SCREEN_BUTTON_PIN);
+Buzzer buzzer(BUZZER_PIN, BuzzerType::PASSIVE);
+AlarmManager alarmManager(buzzer, systemClock);
 
 // Declaration of all the sensors used in the project
 BH1750Sensor  lightSensor;                   // Luminosity sensor
@@ -88,6 +97,7 @@ void setup()
     statusLED.update(); 
     screen.begin();
     screenButton.begin();
+    buzzer.begin();
 
     LoRaWANCommunication::RadioPins loraWANPins = {
         .nss  = SPI_NSS_PIN,
@@ -100,10 +110,9 @@ void setup()
     uint8_t devEui[8];
     uint8_t appKey[16];
     String bleDeviceName;
-    String serviceUUID;
-    String characteristicUUID;
+    String serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID, utcOffsetUUID;
 
-    storage.begin("HomeStation", false);
+    storage.begin(STORAGE_NAMESPACE, false);
     checkConfigResetOnBoot(storage);
     loadOrCreateConfig(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
     loadOrCreateConfig(storage, "appEui", "App EUI", appEui, sizeof(appEui));
@@ -111,9 +120,17 @@ void setup()
     loadOrCreateConfig(storage, "bleName", "BLE Device Name", bleDeviceName, 31, false);
     loadOrCreateConfig(storage, "serUUID", "Service UUID", serviceUUID, 36);
     loadOrCreateConfig(storage, "charUUID", "Characteristic UUID", characteristicUUID, 36);
+    loadOrCreateConfig(storage, "tSynUUID", "Time Sync Characteristic UUID", timeSyncUUID, 36);
+    loadOrCreateConfig(storage, "alTaUUID", "Alarm Target Characteristic UUID", alarmTargetUUID, 36);
+    loadOrCreateConfig(storage, "utcUUID", "UTC Offset Characteristic UUID", utcOffsetUUID, 36);
+
+    bool alarmArmed = storage.getBool("alarmArmed", false);
+    uint32_t alarmTargetEpoch = storage.getUInt("alarmTarget", 0);
+    int8_t utcOffset = storage.getChar("utcOffset", 0);
     storage.end();
 
-    bluetooth = BluetoothCommunication(bleDeviceName, serviceUUID, characteristicUUID);
+    systemClock.setUtcOffset(utcOffset);
+    bluetooth = BluetoothCommunication(bleDeviceName, serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID, utcOffsetUUID);
     lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);
     lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
     {
@@ -126,6 +143,14 @@ void setup()
     bluetooth.begin();
     lorawan.begin();
     //wifi.begin();
+    alarmManager.begin(alarmArmed, alarmTargetEpoch);
+    alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
+    {
+        storage.begin(STORAGE_NAMESPACE, false);
+        storage.putBool("alarmArmed", armed);
+        storage.putUInt("alarmTarget", targetEpoch);
+        storage.end();
+    });
     delay(500);
 
     #if DEBUG_ENABLE
@@ -198,7 +223,7 @@ void setup()
         }
     }
 
-    Serial.println("Configuration used : ");
+    Serial.println("Memory loaded : ");
     Serial.print("devEui: ");
     for (int i = 0; i < 8; i++)
     {
@@ -226,6 +251,18 @@ void setup()
     Serial.println(serviceUUID);
     Serial.print("characteristicUUID: ");
     Serial.println(characteristicUUID);
+    Serial.print("timeSyncUUID: ");
+    Serial.println(timeSyncUUID);
+    Serial.print("alarmTargetUUID: ");
+    Serial.println(alarmTargetUUID);
+    Serial.print("utcOffsetUUID: ");
+    Serial.println(utcOffsetUUID);
+    Serial.print("alarmArmed: ");
+    Serial.println(alarmArmed ? "true" : "false");
+    Serial.print("alarmTargetEpoch: ");
+    Serial.println(alarmTargetEpoch);
+    Serial.print("utcOffset: ");
+    Serial.println(utcOffset);
 
     Serial.println("========================================");
     #endif
@@ -252,15 +289,43 @@ void loop()
     if (now - last100Ms >= TASK_100_MS)
     {
         last100Ms = now;
-        
-        statusLED.update();
-        screenButton.update();
-        screen.update(measurement);
 
         if (screenButton.wasPressed())
         {
-            screen.buttonPressed();
+            if (buzzer.isActive())
+            {
+                alarmManager.dismiss(); 
+            }
+            else
+            {
+                screen.buttonPressed();
+            }
         }
+
+        if (bluetooth.hasNewTimeSync())
+        {
+            systemClock.sync(bluetooth.consumeTimeSync());
+        }
+        if (bluetooth.hasNewUtcOffset())
+        {
+            int8_t offset = bluetooth.consumeUtcOffset();
+            systemClock.setUtcOffset(offset);
+            
+            storage.begin(STORAGE_NAMESPACE, false);
+            storage.putChar("utcOffset", offset);
+            storage.end();
+
+        }
+        if (bluetooth.hasNewAlarmTarget())
+        {
+            alarmManager.setAlarm(bluetooth.consumeAlarmTarget());
+        }
+
+        alarmManager.update();
+        statusLED.update();
+        screenButton.update();
+        screen.update(measurement);
+        buzzer.update();
     }
 
     // Task executed every 1000 ms
@@ -284,6 +349,7 @@ void loop()
 bool readSensors(Measurement& measurement)
 {
     bool success = true;
+    measurement.timestamp = systemClock.now();
     for(int i = 0; i < sensorCount; i++)
     {
         Sensor& sensor = *sensors[i];

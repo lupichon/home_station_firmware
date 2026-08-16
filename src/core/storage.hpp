@@ -36,6 +36,12 @@ class Storage
         String getString(const char* key, const String& defaultValue = "");
 
         // ====================================================
+        // Entiers signés
+        // ====================================================
+        bool putChar(const char* key, int8_t value);
+        int8_t getChar(const char* key, int8_t defaultValue = 0);
+
+        // ====================================================
         // Données binaires
         // ====================================================
 
@@ -133,6 +139,18 @@ inline String Storage::getString(const char* key, const String& defaultValue)
     return preferences.getString(key, defaultValue);
 }
 
+// ============================================================
+// Entiers signés
+// ============================================================
+inline bool Storage::putChar(const char* key, int8_t value)
+{
+    return preferences.putChar(key, value) > 0;
+}
+
+inline int8_t Storage::getChar(const char* key, int8_t defaultValue)
+{
+    return preferences.getChar(key, defaultValue);
+}
 
 // ============================================================
 // Données binaires
