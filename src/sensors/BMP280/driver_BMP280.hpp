@@ -29,7 +29,17 @@ inline bool BMP280Sensor::begin()
 {
 
     initialized = bmp.begin(0x76);
-    // Si ça marche pas tester avec 0x77
+    if(initialized)
+    {
+        bmp.setSampling(
+            Adafruit_BMP280::MODE_NORMAL,
+            Adafruit_BMP280::SAMPLING_X16,
+            Adafruit_BMP280::SAMPLING_X16,
+            Adafruit_BMP280::FILTER_OFF,
+            Adafruit_BMP280::STANDBY_MS_1
+        );
+    }
+
     return initialized;
 }
 
@@ -41,7 +51,6 @@ inline bool BMP280Sensor::read(Measurement& m)
     }
 
     m.pressure = bmp.readPressure() / 100.0f; // hPa
-
     return true;
 }
 
