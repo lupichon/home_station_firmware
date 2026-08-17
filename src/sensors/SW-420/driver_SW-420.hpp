@@ -45,7 +45,7 @@ inline bool SW420Sensor::begin()
             interruptPin,
             handleInterrupt,
             this,
-            RISING      // A voir si c'est vraiment RISING 
+            RISING     
         );
 
         initialized = true;
