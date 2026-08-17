@@ -3,13 +3,16 @@
 #include <Arduino.h>
 #include "../sensor.hpp"
 
-// TODO : A TESTER QUAND LE CAPTEUR SERA SOUDé (REGLER LE SEUIL AUSSI)
-
 class MAX9814Sensor : public Sensor
 {
     private:
         int pin;
         bool soundDetected = false;
+        int signalMax = 0; 
+        int signalMin = 4095;
+        unsigned long windowStart = 0;
+        static constexpr unsigned long WINDOW_MS = 60; 
+        static constexpr int THRESHOLD = 500;
 
     public:
         MAX9814Sensor(int pin);
@@ -38,8 +41,20 @@ inline bool MAX9814Sensor::begin()
 
 inline void MAX9814Sensor::update()
 {
-    int soundLevel = analogRead(pin);
-    soundDetected = (soundLevel > 1000); // Adjust the threshold as needed
+    int sample = analogRead(pin);
+
+    if (sample > signalMax) signalMax = sample;
+    if (sample < signalMin) signalMin = sample;
+
+    if (millis() - windowStart >= WINDOW_MS)
+    {
+        int amplitude = signalMax - signalMin;
+        soundDetected = (amplitude > THRESHOLD);
+
+        signalMax = 0;
+        signalMin = 4095;
+        windowStart = millis();
+    }
 }
 
 inline bool MAX9814Sensor::read(Measurement& m)
