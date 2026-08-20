@@ -13,7 +13,7 @@ class Button
 
         unsigned long lastDebounceTime;
 
-        static constexpr unsigned long DEBOUNCE_TIME = 50;
+        static constexpr unsigned long DEBOUNCE_TIME = 50; 
 
     public:
         Button(uint8_t pin);
@@ -22,6 +22,7 @@ class Button
         void update();
 
         bool wasPressed();
+        bool isHeld() const;
 };
 
 
@@ -81,4 +82,9 @@ inline bool Button::wasPressed()
     }
 
     return false;
+}
+
+inline bool Button::isHeld() const
+{
+    return currentState == LOW;
 }

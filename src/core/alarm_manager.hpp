@@ -20,11 +20,13 @@ class AlarmManager
         void dismiss();
         void onAlarmChanged(AlarmChangedCallback callback);
         bool isArmed() const;
+        bool isRinging() const;
         uint32_t getTargetEpoch() const;
 
     private:
         Buzzer& buzzer;
         Clock& clock;
+        bool ringing = false;
 
         AlarmChangedCallback alarmChangedCallback;
 
@@ -76,6 +78,7 @@ inline void AlarmManager::update()
         if (millis() - buzzStartTime >= MAX_BUZZER_DURATION_MS)
         {
             buzzer.stop();
+            ringing = false;
         }
     }
     if (!armed || !clock.isSynchronized())
@@ -96,6 +99,7 @@ inline void AlarmManager::update()
     {
         buzzer.start();
         buzzStartTime = millis();
+        ringing = true;
     }
 
     clearAlarm();
@@ -129,4 +133,9 @@ inline bool AlarmManager::isArmed() const
 inline uint32_t AlarmManager::getTargetEpoch() const
 {
     return targetEpoch;
+}
+
+inline bool AlarmManager::isRinging() const
+{
+    return ringing;
 }

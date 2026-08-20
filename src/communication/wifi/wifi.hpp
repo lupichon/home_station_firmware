@@ -210,6 +210,7 @@ class WiFiCommunication : public Communication
         void loop();
         bool send(uint8_t* data, size_t size) override;
         void setUtcOffsetTarget(int8_t* ref, std::function<void(int8_t)> cb);
+        bool hasConnectedClient() const; 
 };
 
 
@@ -370,4 +371,9 @@ inline void WiFiCommunication::handleReboot()
 inline void WiFiCommunication::handleNotFound()
 {
     server.send(404, "text/plain", "Not found");
+}
+
+inline bool WiFiCommunication::hasConnectedClient() const 
+{ 
+    return WiFi.softAPgetStationNum() > 0;
 }

@@ -26,7 +26,7 @@ struct MeasurementStatus
     bool lorawanOK;
 };
 
-void clearMeasurement(Measurement& measurement)
+inline void clearMeasurement(Measurement& measurement)
 {
     measurement.timestamp   = 0;
     measurement.temperature = NAN;

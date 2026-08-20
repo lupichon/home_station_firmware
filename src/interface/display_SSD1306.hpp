@@ -40,7 +40,7 @@ class DisplaySSD1306
         void update(const Measurement& measurement);
         void nextPage();
         bool isSleeping() const;
-        void buttonPressed();
+        void interact();
 
     private:
         Adafruit_SSD1306 screen;
@@ -393,7 +393,7 @@ inline void DisplaySSD1306::wake()
     lastActivityTime = millis();
 }
 
-inline void DisplaySSD1306::buttonPressed()
+inline void DisplaySSD1306::interact()
 {
     if (sleeping)
     {

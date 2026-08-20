@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "src/core/measurement.hpp"
+#include "src/core/status.hpp"
 #include "src/core/pins.hpp"
 #include "src/core/storage.hpp"
 #include "src/core/configuration_manager.hpp"
@@ -83,8 +84,9 @@ unsigned long last10Ms   = 0;
 unsigned long last100Ms  = 0;
 unsigned long last1000Ms = 0; 
 
-// Declaration of the measurement structure to hold sensor data
+// Declaration of structures to hold data and status
 Measurement measurement;
+Status status;
 
 void setup()
 {
@@ -303,24 +305,23 @@ void loop()
     {
         last100Ms = now;
 
-        handle_button();
-        handle_bluetooth();
         alarmManager.update();
-        statusLED.update();
-        button.update();
         screen.update(measurement);
         buzzer.update();
+
+        handleButton();
+        handleLED();
+        handleBluetooth();
     }
 
     // Task executed every 1000 ms
     if (now - last1000Ms >= TASK_1000_MS)
     {
         last1000Ms = now;
-
-        MeasurementStatus status = handle_measurements();
-        status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
         
-        updateLedStatus(status);
+        status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
+
+        handle_measurements();
     }
 }
 
@@ -369,9 +370,11 @@ bool sendBluetooth(const uint8_t* buffer, size_t dataSize)
     return success;
 }
 
-void updateLedStatus(MeasurementStatus status)
+void handleLED()
 {
-    if (!status.sensorOK && !status.bluetoothOK && !status.lorawanOK)
+    statusLED.update();
+
+    if (!status.sensorOK && !status.lorawanOK)
     {
         statusLED.setState(StatusLED::State::ERROR);
     }
@@ -387,24 +390,59 @@ void updateLedStatus(MeasurementStatus status)
     {
         statusLED.setState(StatusLED::State::OK);
     }
+
+    statusLED.setIndicator(StatusLED::Indicator::BLUETOOTH_CONNECTED, bluetooth.hasConnectedClient());
+    statusLED.setIndicator(StatusLED::Indicator::WIFI_CONNECTED, wifi.hasConnectedClient());
+    statusLED.setIndicator(StatusLED::Indicator::ALARM_TRIGGERED, alarmManager.isRinging());
+    statusLED.setIndicator(StatusLED::Indicator::ALARM_ARMED, alarmManager.isArmed());
+    statusLED.setIndicator(StatusLED::Indicator::BUTTON_HELD, button.isHeld());
+    statusLED.setIndicator(StatusLED::Indicator::TIME_SYNCED, systemClock.isSynchronized() && systemClock.isSynchronizedSince() <= 30);
 }
 
-void handle_button()
+void handleButton()
 {
+    static unsigned long pressStartMs    = 0;
+    static bool          rebootTriggered = false;
+    constexpr unsigned long REBOOT_HOLD_TIME_MS = 10000;
+
+    button.update();
+
     if (button.wasPressed())
     {
         if (buzzer.isActive())
         {
-            alarmManager.dismiss(); 
+            alarmManager.dismiss();
         }
         else
         {
-            screen.buttonPressed();
+            screen.interact();
         }
+    }
+
+    if (button.isHeld())
+    {
+        if (pressStartMs == 0)
+        {
+            pressStartMs = millis(); 
+        }
+        else if (!rebootTriggered && millis() - pressStartMs >= REBOOT_HOLD_TIME_MS)
+        {
+            rebootTriggered = true;
+            #if DEBUG_ENABLE
+            Serial.println("Bouton maintenu 10s : reboot du systeme.");
+            #endif
+            delay(1000);
+            ESP.restart();
+        }
+    }
+    else
+    {
+        pressStartMs    = 0;
+        rebootTriggered = false;
     }
 }
 
-void handle_bluetooth()
+void handleBluetooth()
 {
     if (bluetooth.hasNewTimeSync())
     {
@@ -416,15 +454,15 @@ void handle_bluetooth()
     }
 }
 
-MeasurementStatus handle_measurements()
+void handle_measurements()
 {
     clearMeasurement(measurement);
-    bool successR = readSensors(measurement);
+    status.sensorOK = readSensors(measurement);
 
     uint8_t buffer[BUFFER_SIZE];
     size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
 
     bool successB = sendBluetooth(buffer, dataSize);
 
-    return { successR, successB, false }; 
+    status.bluetoothOK = successB;
 }

@@ -9,6 +9,7 @@ class Clock
         void sync(uint32_t epoch);
         
         bool isSynchronized() const;
+        uint32_t isSynchronizedSince() const;
         void configure(int8_t offset);
 
         uint32_t now() const;
@@ -96,4 +97,9 @@ inline uint16_t Clock::year(uint32_t epoch) const
 inline void Clock::configure(int8_t offset)
 {
     utcOffset = offset;
+}
+
+inline uint32_t Clock::isSynchronizedSince() const
+{
+    return isSynchronized() ? now() - referenceEpoch : 0;
 }
