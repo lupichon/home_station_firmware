@@ -141,7 +141,7 @@ inline void loadOrCreateConfig(
         }
 
         char buf[maxSize + 1];
-        while (!readStringLine(buf, maxSize + 1, exactSize)) 
+        while (!readStringLine(buf, maxSize + 1, exactSize))
         {
 
         }
@@ -152,14 +152,19 @@ inline void loadOrCreateConfig(
     value = storage.getString(key);
 }
 
+
+// ============================================================
+// Reset au boot
+// ============================================================
+
 inline void checkConfigResetOnBoot(Storage& storage)
 {
     Serial.println();
     Serial.println("Send:");
     Serial.println("0 -> Reset LoRaWAN");
     Serial.println("1 -> Reset Bluetooth");
-    Serial.println("2 -> Reset everything");
-
+    Serial.println("2 -> Reset WiFi AP");
+    Serial.println("3 -> Reset everything");
 
     unsigned long start = millis();
 
@@ -170,7 +175,6 @@ inline void checkConfigResetOnBoot(Storage& storage)
             String cmd = Serial.readStringUntil('\n');
             cmd.trim();
 
-
             if(cmd == "0")
             {
                 storage.remove("devEui");
@@ -178,27 +182,36 @@ inline void checkConfigResetOnBoot(Storage& storage)
                 storage.remove("appKey");
 
                 Serial.println("LoRaWAN reset.");
-                return;
             }
 
-
-            if(cmd == "1")
+            else if(cmd == "1")
             {
                 storage.remove("bleName");
                 storage.remove("serUUID");
                 storage.remove("charUUID");
 
                 Serial.println("Bluetooth reset.");
-                return;
             }
 
+            else if(cmd == "2")
+            {
+                storage.remove("apSSID");
+                storage.remove("apPass");
 
-            if(cmd == "2")
+                Serial.println("WiFi AP reset.");
+            }
+
+            else if(cmd == "3")
             {
                 storage.clear();
 
                 Serial.println("Full reset.");
                 return;
+            }
+
+            else 
+            {
+                Serial.println("Invalid command.");
             }
         }
 

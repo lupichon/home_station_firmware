@@ -19,14 +19,12 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
         String characteristicUUID;
         String timeSyncUUID;
         String alarmTargetUUID;
-        String utcOffsetUUID; 
 
         BLEServer* server;
         BLEService* service;
         BLECharacteristic* measurementCharacteristic;
         BLECharacteristic* timeSyncCharacteristic;
         BLECharacteristic* alarmTargetCharacteristic;
-        BLECharacteristic* utcOffsetCharacteristic;
 
         bool newTimeSync = false;
         uint32_t timeSyncValue = 0;
@@ -37,10 +35,9 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
 
     public:
 
-        BluetoothCommunication() = default;
-        BluetoothCommunication(const String& name, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID, const String& utcOffsetUUID);
-
-        bool begin();
+        BluetoothCommunication();
+        void configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID);
+        bool begin() override;
         bool send(uint8_t* data, size_t dataSize) override;
         bool hasConnectedClient() const;
         void onConnect(BLEServer* server) override;
@@ -71,22 +68,25 @@ inline void BluetoothCommunication::onDisconnect(BLEServer* server)
 // Constructor
 // ============================================================
 
-inline BluetoothCommunication::BluetoothCommunication(const String& name, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID, const String& utcOffsetUUID)
-    : deviceName(name),
-      serviceUUID(serviceUUID),
-      characteristicUUID(characteristicUUID),
-      timeSyncUUID(timeSyncUUID),
-      alarmTargetUUID(alarmTargetUUID),
-      utcOffsetUUID(utcOffsetUUID),
+inline BluetoothCommunication::BluetoothCommunication()
+    :
       server(nullptr),
       service(nullptr),
       measurementCharacteristic(nullptr),
       timeSyncCharacteristic(nullptr),
       alarmTargetCharacteristic(nullptr),
-      utcOffsetCharacteristic(nullptr),
       Communication()
 {
 
+}
+
+void BluetoothCommunication::configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID)
+{
+    this->deviceName = deviceName;
+    this->serviceUUID = serviceUUID;
+    this->characteristicUUID = characteristicUUID;
+    this->timeSyncUUID = timeSyncUUID;
+    this->alarmTargetUUID = alarmTargetUUID;
 }
 
 
@@ -128,13 +128,6 @@ inline bool BluetoothCommunication::begin()
     );
     if (alarmTargetCharacteristic == nullptr) return false;
     alarmTargetCharacteristic->setCallbacks(this);
-
-    utcOffsetCharacteristic = service->createCharacteristic(
-        BLEUUID(utcOffsetUUID.c_str()),
-        BLECharacteristic::PROPERTY_WRITE
-    );
-    if (utcOffsetCharacteristic == nullptr) return false;
-    utcOffsetCharacteristic->setCallbacks(this);
 
     service->start();
 
@@ -195,12 +188,6 @@ inline void BluetoothCommunication::onWrite(BLECharacteristic* characteristic)
         memcpy(&alarmTargetValue, value.c_str(), sizeof(uint32_t));
         newAlarmTarget = true;
     }
-    else if (characteristic == utcOffsetCharacteristic)
-    {
-        if (value.length() != sizeof(int8_t)) return;
-        utcOffsetValue = (int8_t)value[0];
-        newUtcOffset = true;
-    }
 }
 
 inline bool BluetoothCommunication::hasNewTimeSync() const
@@ -224,15 +211,3 @@ inline uint32_t BluetoothCommunication::consumeAlarmTarget()
     newAlarmTarget = false;
     return alarmTargetValue;
 }
-
-inline bool BluetoothCommunication::hasNewUtcOffset() const
-{
-    return newUtcOffset;
-}
-
-inline int32_t BluetoothCommunication::consumeUtcOffset()
-{
-    newUtcOffset = false;
-    return utcOffsetValue;
-}
-

@@ -19,6 +19,13 @@ struct Measurement
     bool vibration     = false;
 };
 
+struct MeasurementStatus
+{
+    bool sensorOK; 
+    bool bluetoothOK;
+    bool lorawanOK;
+};
+
 void clearMeasurement(Measurement& measurement)
 {
     measurement.timestamp   = 0;

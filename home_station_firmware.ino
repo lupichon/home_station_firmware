@@ -17,7 +17,7 @@
 #include "src/sensors/SGP41/driver_SGP41.hpp"
 #include "src/communication/data_serializer.hpp"
 #include "src/communication/bluetooth/bluetooth.hpp"
-//#include "src/communication/wifi/wifi.hpp"
+#include "src/communication/wifi/wifi.hpp"
 #include "src/communication/LoRaWAN/lorawan.hpp"
 #include "src/interface/status_led.hpp"
 #include "src/interface/display_SSD1306.hpp"
@@ -36,12 +36,12 @@ Storage storage;
 // Declaration of communcation interfaces
 extern HardwareSerial Serial;
 BluetoothCommunication bluetooth;
-//WiFiCommunication wifi("your_ssid", "your_password");
+WiFiCommunication wifi;
 
 // Declaration of elements for the interface with the user (LEDs, buttons, screens, etc.)
 StatusLED statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
 DisplaySSD1306 screen(systemClock);
-Button screenButton(SCREEN_BUTTON_PIN);
+Button button(SCREEN_BUTTON_PIN);
 Buzzer buzzer(BUZZER_PIN, BuzzerType::PASSIVE);
 AlarmManager alarmManager(buzzer, systemClock);
 
@@ -96,7 +96,7 @@ void setup()
     statusLED.setState(StatusLED::State::STARTING);
     statusLED.update(); 
     screen.begin();
-    screenButton.begin();
+    button.begin();
     buzzer.begin();
 
     LoRaWANCommunication::RadioPins loraWANPins = {
@@ -110,7 +110,8 @@ void setup()
     uint8_t devEui[8];
     uint8_t appKey[16];
     String bleDeviceName;
-    String serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID, utcOffsetUUID;
+    String serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID;
+    String wifiApSSID, wifiApPassword; 
 
     storage.begin(STORAGE_NAMESPACE, false);
     checkConfigResetOnBoot(storage);
@@ -122,16 +123,19 @@ void setup()
     loadOrCreateConfig(storage, "charUUID", "Characteristic UUID", characteristicUUID, 36);
     loadOrCreateConfig(storage, "tSynUUID", "Time Sync Characteristic UUID", timeSyncUUID, 36);
     loadOrCreateConfig(storage, "alTaUUID", "Alarm Target Characteristic UUID", alarmTargetUUID, 36);
-    loadOrCreateConfig(storage, "utcUUID", "UTC Offset Characteristic UUID", utcOffsetUUID, 36);
+    loadOrCreateConfig(storage, "apSSID", "WiFi AP SSID", wifiApSSID, 32, false);
+    loadOrCreateConfig(storage, "apPass", "WiFi AP Password", wifiApPassword, 64, false);
 
     bool alarmArmed = storage.getBool("alarmArmed", false);
     uint32_t alarmTargetEpoch = storage.getUInt("alarmTarget", 0);
     int8_t utcOffset = storage.getChar("utcOffset", 0);
     storage.end();
 
-    systemClock.setUtcOffset(utcOffset);
-    bluetooth = BluetoothCommunication(bleDeviceName, serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID, utcOffsetUUID);
-    lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);
+    systemClock.configure(utcOffset);
+    wifi.configure(wifiApSSID, wifiApPassword);
+    bluetooth.configure(bleDeviceName, serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID);
+
+    lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);    //TODO meme principe que les autres (confgure)
     lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
     {
         return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
@@ -142,7 +146,8 @@ void setup()
     SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
     bluetooth.begin();
     lorawan.begin();
-    //wifi.begin();
+    wifi.begin();
+
     alarmManager.begin(alarmArmed, alarmTargetEpoch);
     alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
     {
@@ -151,7 +156,6 @@ void setup()
         storage.putUInt("alarmTarget", targetEpoch);
         storage.end();
     });
-    delay(500);
 
     #if DEBUG_ENABLE
     Serial.println("========  HomeStation Firmware  ========");
@@ -160,21 +164,23 @@ void setup()
 
     if (bluetooth.isInitialized())
     {
-        Serial.println("Bluetooth used.");
+        Serial.print("Bluetooth started. Device Name: ");
+        Serial.println(bleDeviceName);
     }
     else
     {
-        Serial.println("Bluetooth not used");
+        Serial.println("Bluetooth not started.");
     }
 
-    // if (wifi.isConnected())
-    // {
-    //     Serial.println("WiFi used.");
-    // }
-    // else
-    // {
-    //     Serial.println("WiFi not used");
-    // }
+    if (wifi.isInitialized())
+    {
+        Serial.print("WiFi AP started. IP: ");
+        Serial.println(WiFi.softAPIP());
+    }
+    else
+    {
+        Serial.println("WiFi AP not started.");
+    }
 
     if (lorawan.isInitialized())
     {
@@ -255,8 +261,6 @@ void setup()
     Serial.println(timeSyncUUID);
     Serial.print("alarmTargetUUID: ");
     Serial.println(alarmTargetUUID);
-    Serial.print("utcOffsetUUID: ");
-    Serial.println(utcOffsetUUID);
     Serial.print("alarmArmed: ");
     Serial.println(alarmArmed ? "true" : "false");
     Serial.print("alarmTargetEpoch: ");
@@ -266,6 +270,8 @@ void setup()
 
     Serial.println("========================================");
     #endif
+
+    delay(500);
 }
 
 
@@ -273,11 +279,18 @@ void loop()
 {
     unsigned long now = millis();
 
+    // Task executed every iteration
     if (lorawan.isInitialized())
     {
         lorawan.loop();
     }
+    
+    if (wifi.isInitialized())
+    {
+        wifi.loop();
+    }
 
+    // Task executed every 10 ms
     if (now - last10Ms >= TASK_10_MS)
     {
         last10Ms = now;
@@ -290,40 +303,11 @@ void loop()
     {
         last100Ms = now;
 
-        if (screenButton.wasPressed())
-        {
-            if (buzzer.isActive())
-            {
-                alarmManager.dismiss(); 
-            }
-            else
-            {
-                screen.buttonPressed();
-            }
-        }
-
-        if (bluetooth.hasNewTimeSync())
-        {
-            systemClock.sync(bluetooth.consumeTimeSync());
-        }
-        if (bluetooth.hasNewUtcOffset())
-        {
-            int8_t offset = bluetooth.consumeUtcOffset();
-            systemClock.setUtcOffset(offset);
-            
-            storage.begin(STORAGE_NAMESPACE, false);
-            storage.putChar("utcOffset", offset);
-            storage.end();
-
-        }
-        if (bluetooth.hasNewAlarmTarget())
-        {
-            alarmManager.setAlarm(bluetooth.consumeAlarmTarget());
-        }
-
+        handle_button();
+        handle_bluetooth();
         alarmManager.update();
         statusLED.update();
-        screenButton.update();
+        button.update();
         screen.update(measurement);
         buzzer.update();
     }
@@ -332,17 +316,11 @@ void loop()
     if (now - last1000Ms >= TASK_1000_MS)
     {
         last1000Ms = now;
-        
-        clearMeasurement(measurement);
-        bool successR = readSensors(measurement);  
 
-        uint8_t buffer[BUFFER_SIZE];
-        size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
-
-        bool successB = sendBluetooth(buffer, dataSize);
-        bool successL = lorawan.isInitialized() && lorawan.isJoined();
+        MeasurementStatus status = handle_measurements();
+        status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
         
-        updateStatus(successR, successB, successL);
+        updateLedStatus(status);
     }
 }
 
@@ -360,7 +338,7 @@ bool readSensors(Measurement& measurement)
             success &= successSensor;
 
             #if DEBUG_ENABLE
-                Serial.println(sensor.displayValue(measurement));
+            Serial.println(sensor.displayValue(measurement));
             #endif
         }
         else
@@ -391,17 +369,17 @@ bool sendBluetooth(const uint8_t* buffer, size_t dataSize)
     return success;
 }
 
-void updateStatus(bool sensorsOK, bool bluetoothOK, bool lorawanOK)
+void updateLedStatus(MeasurementStatus status)
 {
-    if (!sensorsOK && !bluetoothOK && !lorawanOK)
+    if (!status.sensorOK && !status.bluetoothOK && !status.lorawanOK)
     {
         statusLED.setState(StatusLED::State::ERROR);
     }
-    else if (!sensorsOK)
+    else if (!status.sensorOK)
     {
         statusLED.setState(StatusLED::State::WARNING_SENSOR);
     }
-    else if (!bluetoothOK || !lorawanOK)
+    else if (!status.bluetoothOK || !status.lorawanOK)
     {
         statusLED.setState(StatusLED::State::WARNING_COMMUNICATION);
     }
@@ -411,23 +389,42 @@ void updateStatus(bool sensorsOK, bool bluetoothOK, bool lorawanOK)
     }
 }
 
-/*bool sendLoRaWAN(const uint8_t* buffer, size_t dataSize)
+void handle_button()
 {
-    if (!lorawan.isInitialized() || dataSize == 0)
+    if (button.wasPressed())
     {
-        return false; // vraie erreur
+        if (buzzer.isActive())
+        {
+            alarmManager.dismiss(); 
+        }
+        else
+        {
+            screen.buttonPressed();
+        }
     }
+}
 
-    if (!lorawan.isJoined() || lorawan.isTxPending())
+void handle_bluetooth()
+{
+    if (bluetooth.hasNewTimeSync())
     {
-        return true; // pas d'erreur, join en cours ou TX occupé
+        systemClock.sync(bluetooth.consumeTimeSync());
     }
+    if (bluetooth.hasNewAlarmTarget())
+    {
+        alarmManager.setAlarm(bluetooth.consumeAlarmTarget());
+    }
+}
 
-    bool success = lorawan.send(const_cast<uint8_t*>(buffer), dataSize);
+MeasurementStatus handle_measurements()
+{
+    clearMeasurement(measurement);
+    bool successR = readSensors(measurement);
 
-    #if DEBUG_ENABLE
-    if (success) Serial.println("Data sent over LoRaWAN.");
-    #endif
+    uint8_t buffer[BUFFER_SIZE];
+    size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
 
-    return success;
-}*/
+    bool successB = sendBluetooth(buffer, dataSize);
+
+    return { successR, successB, false }; 
+}

@@ -9,7 +9,7 @@ class Clock
         void sync(uint32_t epoch);
         
         bool isSynchronized() const;
-        void setUtcOffset(int8_t offset);
+        void configure(int8_t offset);
 
         uint32_t now() const;
 
@@ -93,7 +93,7 @@ inline uint16_t Clock::year(uint32_t epoch) const
     return timeinfo->tm_year + 1900;
 }
 
-inline void Clock::setUtcOffset(int8_t offset)
+inline void Clock::configure(int8_t offset)
 {
     utcOffset = offset;
 }
