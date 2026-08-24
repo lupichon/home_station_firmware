@@ -163,6 +163,26 @@ void setup()
         communications[i]->begin();
     }
 
+    for(int i = 0; i < sensorCount; i++)
+    {
+        if (!((deviceConfig.enabledSensorsMask >> i) & 0x01)) continue; 
+
+        if(!sensors[i]->begin())
+        {
+            #if DEBUG_ENABLE
+            Serial.print("Error: Initialization failed for sensor: ");
+            Serial.println(sensors[i]->getName());
+            #endif
+        }
+        else
+        {
+            #if DEBUG_ENABLE
+            Serial.print("OK : ");
+            Serial.println(sensors[i]->getName());
+            #endif
+        }
+    }
+
     #if DEBUG_ENABLE
     Serial.println("========  HomeStation Firmware  ========");
     Serial.print("Number of sensors: ");
@@ -206,24 +226,6 @@ void setup()
     {
         Serial.printf("Downlink recu sur port %d\n", port);
     });
-
-    for(int i = 0; i < sensorCount; i++)
-    {
-        if(!sensors[i]->begin())
-        {
-            #if DEBUG_ENABLE
-                Serial.print("Error: Initialization failed for sensor: ");
-                Serial.println(sensors[i]->getName());
-            #endif
-        }
-        else
-        {
-            #if DEBUG_ENABLE
-                Serial.print("OK : ");
-                Serial.println(sensors[i]->getName());
-            #endif
-        }
-    }
 
     for (uint8_t addr = 1; addr < 127; addr++)
     {
@@ -340,6 +342,7 @@ void handleBuzzer()
 
 void handleSoundSensor()
 {
+    if (!((deviceConfig.enabledSensorsMask >> 3) & 0x01)) return; 
     soundSensor.update();
 }
 
