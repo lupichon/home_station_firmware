@@ -34,8 +34,10 @@ inline bool SCD41Sensor::begin()
 {
     sensor.begin(Wire, 0x62);
 
-    sensor.stopPeriodicMeasurement(); // Stop si déjà en cours
-    delay(500);                        // Attendre que le capteur soit prêt
+    sensor.wakeUp();
+    sensor.stopPeriodicMeasurement();
+    sensor.reinit();
+    delay(1000);                        
 
     int16_t error = sensor.startPeriodicMeasurement();
 

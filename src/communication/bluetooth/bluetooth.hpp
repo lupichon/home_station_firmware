@@ -26,12 +26,9 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
         BLECharacteristic* timeSyncCharacteristic;
         BLECharacteristic* alarmTargetCharacteristic;
 
-        bool newTimeSync = false;
-        uint32_t timeSyncValue = 0;
-        bool newAlarmTarget = false;
-        uint32_t alarmTargetValue = 0;
-        bool newUtcOffset = false;
-        int32_t utcOffsetValue = 0;
+        // Callbacks appelés directement depuis onWrite() (tâche BLE), pas depuis loop()
+        std::function<void(uint32_t)> onTimeSyncReceived;
+        std::function<void(uint32_t)> onAlarmTargetReceived;
 
     public:
 
@@ -43,12 +40,8 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
         void onConnect(BLEServer* server) override;
         void onDisconnect(BLEServer* server) override;
         void onWrite(BLECharacteristic* characteristic) override;
-        bool hasNewTimeSync() const;
-        uint32_t consumeTimeSync();
-        bool hasNewAlarmTarget() const;
-        uint32_t consumeAlarmTarget();
-        bool hasNewUtcOffset() const;
-        int32_t consumeUtcOffset();
+        void setTimeSyncCallback(std::function<void(uint32_t)> cb);
+        void setAlarmTargetCallback(std::function<void(uint32_t)> cb);
 };
 
 inline void BluetoothCommunication::onConnect(BLEServer* server)
@@ -172,6 +165,11 @@ inline bool BluetoothCommunication::hasConnectedClient() const
     return server->getConnectedCount() > 0;
 }
 
+// ============================================================
+// Write handling — déclenche directement le callback correspondant
+// (exécuté dans la tâche BLE, pas dans loop())
+// ============================================================
+
 inline void BluetoothCommunication::onWrite(BLECharacteristic* characteristic)
 {
     String value = characteristic->getValue();
@@ -179,35 +177,39 @@ inline void BluetoothCommunication::onWrite(BLECharacteristic* characteristic)
     if (characteristic == timeSyncCharacteristic)
     {
         if (value.length() != sizeof(uint32_t)) return;
-        memcpy(&timeSyncValue, value.c_str(), sizeof(uint32_t));
-        newTimeSync = true;
+
+        uint32_t epoch;
+        memcpy(&epoch, value.c_str(), sizeof(uint32_t));
+
+        if (onTimeSyncReceived)
+        {
+            onTimeSyncReceived(epoch);
+        }
     }
     else if (characteristic == alarmTargetCharacteristic)
     {
         if (value.length() != sizeof(uint32_t)) return;
-        memcpy(&alarmTargetValue, value.c_str(), sizeof(uint32_t));
-        newAlarmTarget = true;
+
+        uint32_t targetEpoch;
+        memcpy(&targetEpoch, value.c_str(), sizeof(uint32_t));
+
+        if (onAlarmTargetReceived)
+        {
+            onAlarmTargetReceived(targetEpoch);
+        }
     }
 }
 
-inline bool BluetoothCommunication::hasNewTimeSync() const
+// ============================================================
+// Callback wiring
+// ============================================================
+
+inline void BluetoothCommunication::setTimeSyncCallback(std::function<void(uint32_t)> cb)
 {
-    return newTimeSync;
-}
- 
-inline uint32_t BluetoothCommunication::consumeTimeSync()
-{
-    newTimeSync = false;
-    return timeSyncValue;
+    onTimeSyncReceived = cb;
 }
 
-inline bool BluetoothCommunication::hasNewAlarmTarget() const
+inline void BluetoothCommunication::setAlarmTargetCallback(std::function<void(uint32_t)> cb)
 {
-    return newAlarmTarget;
-}
- 
-inline uint32_t BluetoothCommunication::consumeAlarmTarget()
-{
-    newAlarmTarget = false;
-    return alarmTargetValue;
+    onAlarmTargetReceived = cb;
 }

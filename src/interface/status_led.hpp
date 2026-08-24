@@ -77,9 +77,9 @@ class StatusLED
         bool          ledOn        = false;
 
         // Séquenceur : -1 = on affiche l'état, >=0 = index dans la liste des indicateurs actifs
-        static constexpr uint16_t STATE_PHASE_MS = 2000; // durée d'affichage de l'état avant de passer aux indicateurs
-        static constexpr uint16_t PULSE_ON_MS    = 300;  // durée du flash d'un indicateur
-        static constexpr uint16_t PULSE_GAP_MS   = 150;  // pause entre deux flashs
+        static constexpr uint16_t STATE_PHASE_MS = 5000; // durée d'affichage de l'état avant de passer aux indicateurs
+        static constexpr uint16_t PULSE_ON_MS    = 500;  // durée du flash d'un indicateur
+        static constexpr uint16_t PULSE_GAP_MS   = 200;  // pause entre deux flashs
 
         unsigned long phaseStartMs           = 0;
         int8_t        currentIndicatorIndex  = -1;

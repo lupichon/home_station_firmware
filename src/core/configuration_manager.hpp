@@ -177,26 +177,26 @@ inline void checkConfigResetOnBoot(Storage& storage)
 
             if(cmd == "0")
             {
-                storage.remove("devEui");
-                storage.remove("appEui");
-                storage.remove("appKey");
+                storage.remove(Storage::devEUIKey);
+                storage.remove(Storage::appEUIKey);
+                storage.remove(Storage::appKeyKey);
 
                 Serial.println("LoRaWAN reset.");
             }
 
             else if(cmd == "1")
             {
-                storage.remove("bleName");
-                storage.remove("serUUID");
-                storage.remove("charUUID");
+                storage.remove(Storage::bleNameKey);
+                storage.remove(Storage::serviceUUIDKey);
+                storage.remove(Storage::characteristicUUIDKey);
 
                 Serial.println("Bluetooth reset.");
             }
 
             else if(cmd == "2")
             {
-                storage.remove("apSSID");
-                storage.remove("apPass");
+                storage.remove(Storage::wifiApSSIDKey);
+                storage.remove(Storage::wifiApPasswordKey);
 
                 Serial.println("WiFi AP reset.");
             }
@@ -217,4 +217,54 @@ inline void checkConfigResetOnBoot(Storage& storage)
 
         delay(10);
     }
+}
+
+inline String bytesToHex(const uint8_t* data, size_t size)
+{
+    String result;
+
+    for (size_t i = 0; i < size; i++)
+    {
+        if (data[i] < 0x10)
+            result += "0";
+
+        result += String(data[i], HEX);
+    }
+
+    result.toUpperCase();
+
+    return result;
+}
+
+static inline void hexToBytes(const char* hex, uint8_t* bytes, size_t len)
+{
+    for (size_t i = 0; i < len; i++)
+    {
+        char hi = hex[i * 2];
+        char lo = hex[i * 2 + 1];
+
+        auto hexCharToVal = [](char c) -> uint8_t {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return 0;
+        };
+
+        bytes[i] = (hexCharToVal(hi) << 4) | hexCharToVal(lo);
+    }
+}
+
+inline bool isHexString(const String value, size_t expectedLength)
+{
+    if (value.length() != expectedLength) return false;
+    
+    for (size_t i = 0; i < value.length(); i++)
+    {
+        char c = value[i];
+        bool isDigit = (c >= '0' && c <= '9');
+        bool isLower = (c >= 'a' && c <= 'f');
+        bool isUpper = (c >= 'A' && c <= 'F');
+        if (!isDigit && !isLower && !isUpper) return false;
+    }
+    return true;
 }

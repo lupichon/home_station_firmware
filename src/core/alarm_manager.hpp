@@ -108,6 +108,7 @@ inline void AlarmManager::update()
 inline void AlarmManager::clearAlarm()
 {
     armed = false;
+    ringing = false;
     targetEpoch = 0;
     notifyChanged();
 }

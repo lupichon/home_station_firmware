@@ -7,6 +7,7 @@
 #include "src/core/configuration_manager.hpp"
 #include "src/core/alarm_manager.hpp"
 #include "src/core/clock.hpp"
+#include "src/core/device_config.hpp"
 #include "src/sensors/BH1750/driver_BH1750.hpp"
 #include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
 #include "src/sensors/SCD41/driver_SCD41.hpp"
@@ -26,8 +27,6 @@
 #include "src/interface/buzzer.hpp"
 
 #define DEBUG_ENABLE 1
-
-constexpr const char* STORAGE_NAMESPACE = "HomeStation";
 
 Clock systemClock;
 
@@ -87,6 +86,10 @@ unsigned long last1000Ms = 0;
 // Declaration of structures to hold data and status
 Measurement measurement;
 Status status;
+DeviceConfig deviceConfig;
+
+uint8_t buffer[BUFFER_SIZE];
+size_t dataSize = 0;
 
 void setup()
 {
@@ -108,41 +111,38 @@ void setup()
         .dio1 = SX1276_DIO1_PIN
     };
 
-    uint8_t appEui[8];
-    uint8_t devEui[8];
-    uint8_t appKey[16];
-    String bleDeviceName;
-    String serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID;
-    String wifiApSSID, wifiApPassword; 
-
-    storage.begin(STORAGE_NAMESPACE, false);
+    storage.begin(Storage::STORAGE_NAMESPACE, false);
     checkConfigResetOnBoot(storage);
-    loadOrCreateConfig(storage, "devEui", "Dev EUI", devEui, sizeof(devEui));
-    loadOrCreateConfig(storage, "appEui", "App EUI", appEui, sizeof(appEui));
-    loadOrCreateConfig(storage, "appKey", "App Key", appKey, sizeof(appKey));
-    loadOrCreateConfig(storage, "bleName", "BLE Device Name", bleDeviceName, 31, false);
-    loadOrCreateConfig(storage, "serUUID", "Service UUID", serviceUUID, 36);
-    loadOrCreateConfig(storage, "charUUID", "Characteristic UUID", characteristicUUID, 36);
-    loadOrCreateConfig(storage, "tSynUUID", "Time Sync Characteristic UUID", timeSyncUUID, 36);
-    loadOrCreateConfig(storage, "alTaUUID", "Alarm Target Characteristic UUID", alarmTargetUUID, 36);
-    loadOrCreateConfig(storage, "apSSID", "WiFi AP SSID", wifiApSSID, 32, false);
-    loadOrCreateConfig(storage, "apPass", "WiFi AP Password", wifiApPassword, 64, false);
+    loadOrCreateConfig(storage, Storage::devEUIKey, "Dev EUI", deviceConfig.devEui, sizeof(deviceConfig.devEui));
+    loadOrCreateConfig(storage, Storage::appEUIKey, "App EUI", deviceConfig.appEui, sizeof(deviceConfig.appEui));
+    loadOrCreateConfig(storage, Storage::appKeyKey, "App Key", deviceConfig.appKey, sizeof(deviceConfig.appKey));
+    loadOrCreateConfig(storage, Storage::bleNameKey, "BLE Device Name", deviceConfig.bleDeviceName, 31, false);
+    loadOrCreateConfig(storage, Storage::serviceUUIDKey, "Service UUID", deviceConfig.serviceUUID, 36);
+    loadOrCreateConfig(storage, Storage::characteristicUUIDKey, "Characteristic UUID", deviceConfig.characteristicUUID, 36);
+    loadOrCreateConfig(storage, Storage::timeSyncUUIDKey, "Time Sync Characteristic UUID", deviceConfig.timeSyncUUID, 36);
+    loadOrCreateConfig(storage, Storage::alarmTargetUUIDKey, "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID, 36);
+    loadOrCreateConfig(storage, Storage::wifiApSSIDKey, "WiFi AP SSID", deviceConfig.wifiApSSID, 32, false);
+    loadOrCreateConfig(storage, Storage::wifiApPasswordKey, "WiFi AP Password", deviceConfig.wifiApPassword, 64, false);
 
-    bool alarmArmed = storage.getBool("alarmArmed", false);
-    uint32_t alarmTargetEpoch = storage.getUInt("alarmTarget", 0);
-    int8_t utcOffset = storage.getChar("utcOffset", 0);
+    bool alarmArmed = storage.getBool(Storage::alarmArmedKey, false);
+    uint32_t alarmTargetEpoch = storage.getUInt(Storage::alarmTargetKey, 0);
+    deviceConfig.utcOffset = storage.getChar(Storage::utcOffsetKey, 0);
+    deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(Storage::enabledSensorsMaskKey, 0xFFFF));
     storage.end();
 
-    systemClock.configure(utcOffset);
-    wifi.configure(wifiApSSID, wifiApPassword);
-    bluetooth.configure(bleDeviceName, serviceUUID, characteristicUUID, timeSyncUUID, alarmTargetUUID);
-
-    lorawan = LoRaWANCommunication(loraWANPins, devEui, appEui, appKey);    //TODO meme principe que les autres (confgure)
+    systemClock.configure(deviceConfig.utcOffset);
+    wifi.configure(deviceConfig.wifiApSSID, deviceConfig.wifiApPassword);
+    bluetooth.configure(deviceConfig.bleDeviceName, deviceConfig.serviceUUID, deviceConfig.characteristicUUID, deviceConfig.timeSyncUUID, deviceConfig.alarmTargetUUID);
+    lorawan = LoRaWANCommunication(loraWANPins, deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey);    //TODO meme principe que les autres (confgure)
     lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
     {
         return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
     });
     lorawan.setAutoUplinkInterval(60); // Send data every 60 seconds
+
+    setAlarmManagerCallbacks();
+    setWifiCallbacks();
+    setBluetoothCallbacks();
 
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
@@ -151,13 +151,6 @@ void setup()
     wifi.begin();
 
     alarmManager.begin(alarmArmed, alarmTargetEpoch);
-    alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
-    {
-        storage.begin(STORAGE_NAMESPACE, false);
-        storage.putBool("alarmArmed", armed);
-        storage.putUInt("alarmTarget", targetEpoch);
-        storage.end();
-    });
 
     #if DEBUG_ENABLE
     Serial.println("========  HomeStation Firmware  ========");
@@ -167,7 +160,7 @@ void setup()
     if (bluetooth.isInitialized())
     {
         Serial.print("Bluetooth started. Device Name: ");
-        Serial.println(bleDeviceName);
+        Serial.println(deviceConfig.bleDeviceName);
     }
     else
     {
@@ -235,40 +228,42 @@ void setup()
     Serial.print("devEui: ");
     for (int i = 0; i < 8; i++)
     {
-        Serial.print(devEui[i], HEX);
+        Serial.print(deviceConfig.devEui[i], HEX);
         if (i < 7) Serial.print(":");
     }
     Serial.println();
     Serial.print("appEui: ");
     for (int i = 0; i < 8; i++)
     {
-        Serial.print(appEui[i], HEX);
+        Serial.print(deviceConfig.appEui[i], HEX);
         if (i < 7) Serial.print(":");
     }
     Serial.println();
     Serial.print("appKey: ");
     for (int i = 0; i < 16; i++)
     {
-        Serial.print(appKey[i], HEX);
+        Serial.print(deviceConfig.appKey[i], HEX);
         if (i < 15) Serial.print(":");
     }
     Serial.println();
     Serial.print("bleDeviceName: ");
-    Serial.println(bleDeviceName);
+    Serial.println(deviceConfig.bleDeviceName);
     Serial.print("serviceUUID: ");
-    Serial.println(serviceUUID);
+    Serial.println(deviceConfig.serviceUUID);
     Serial.print("characteristicUUID: ");
-    Serial.println(characteristicUUID);
+    Serial.println(deviceConfig.characteristicUUID);
     Serial.print("timeSyncUUID: ");
-    Serial.println(timeSyncUUID);
+    Serial.println(deviceConfig.timeSyncUUID);
     Serial.print("alarmTargetUUID: ");
-    Serial.println(alarmTargetUUID);
+    Serial.println(deviceConfig.alarmTargetUUID);
     Serial.print("alarmArmed: ");
     Serial.println(alarmArmed ? "true" : "false");
     Serial.print("alarmTargetEpoch: ");
     Serial.println(alarmTargetEpoch);
     Serial.print("utcOffset: ");
-    Serial.println(utcOffset);
+    Serial.println(deviceConfig.utcOffset);
+    Serial.print("enabledSensorsMask: ");
+    Serial.println(deviceConfig.enabledSensorsMask, BIN);
 
     Serial.println("========================================");
     #endif
@@ -282,22 +277,15 @@ void loop()
     unsigned long now = millis();
 
     // Task executed every iteration
-    if (lorawan.isInitialized())
-    {
-        lorawan.loop();
-    }
-    
-    if (wifi.isInitialized())
-    {
-        wifi.loop();
-    }
+    handleLoRaWAN();
+    handleWifi();
 
     // Task executed every 10 ms
     if (now - last10Ms >= TASK_10_MS)
     {
         last10Ms = now;
 
-        soundSensor.update();
+        handleSoundSensor();
     }
 
     // Task executed every 100 ms
@@ -305,13 +293,11 @@ void loop()
     {
         last100Ms = now;
 
-        alarmManager.update();
-        screen.update(measurement);
-        buzzer.update();
-
+        handleAlarmManager();
+        handleScreen();
+        handleBuzzer();
         handleButton();
         handleLED();
-        handleBluetooth();
     }
 
     // Task executed every 1000 ms
@@ -321,53 +307,45 @@ void loop()
         
         status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
 
-        handle_measurements();
+        handleMeasurements();
+        handleBluetooth();
     }
 }
 
-bool readSensors(Measurement& measurement)
+void handleAlarmManager()
 {
-    bool success = true;
-    measurement.timestamp = systemClock.now();
-    for(int i = 0; i < sensorCount; i++)
-    {
-        Sensor& sensor = *sensors[i];
-
-        if(sensor.isInitialized())
-        {
-            bool successSensor = sensor.read(measurement);
-            success &= successSensor;
-
-            #if DEBUG_ENABLE
-            Serial.println(sensor.displayValue(measurement));
-            #endif
-        }
-        else
-        {
-            success = false;
-        }
-    }
-    return success;
+    alarmManager.update();
 }
 
-bool sendBluetooth(const uint8_t* buffer, size_t dataSize)
+void handleScreen()
 {
-    if (!bluetooth.isInitialized() || dataSize == 0)
+    screen.update(measurement);
+}
+
+void handleBuzzer()
+{
+    buzzer.update();
+}
+
+void handleSoundSensor()
+{
+    soundSensor.update();
+}
+
+void handleWifi()
+{
+    if (wifi.isInitialized())
     {
-        return false; // vraie erreur
+        wifi.loop();
     }
+}
 
-    if (!bluetooth.hasConnectedClient())
+void handleLoRaWAN()
+{
+    if (lorawan.isInitialized())
     {
-        return true; // pas d'erreur, juste personne de connecté
+        lorawan.loop();
     }
-    bool success = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
-
-    #if DEBUG_ENABLE
-    if (success) Serial.println("Data sent over Bluetooth.");
-    #endif
-
-    return success;
 }
 
 void handleLED()
@@ -442,27 +420,180 @@ void handleButton()
     }
 }
 
-void handleBluetooth()
-{
-    if (bluetooth.hasNewTimeSync())
-    {
-        systemClock.sync(bluetooth.consumeTimeSync());
-    }
-    if (bluetooth.hasNewAlarmTarget())
-    {
-        alarmManager.setAlarm(bluetooth.consumeAlarmTarget());
-    }
-}
-
-void handle_measurements()
+void handleMeasurements()
 {
     clearMeasurement(measurement);
-    status.sensorOK = readSensors(measurement);
 
-    uint8_t buffer[BUFFER_SIZE];
-    size_t dataSize = serialize(measurement, buffer, sizeof(buffer));
+    bool success = true;
+    measurement.timestamp = systemClock.now();
+    for(int i = 0; i < sensorCount; i++)
+    {
+        bool sensorEnabled = (deviceConfig.enabledSensorsMask >> i) & 0x01;
+        if (!sensorEnabled) continue;
 
-    bool successB = sendBluetooth(buffer, dataSize);
+        Sensor& sensor = *sensors[i];
 
-    status.bluetoothOK = successB;
+        if(sensor.isInitialized())
+        {
+            bool successSensor = sensor.read(measurement);
+            success &= successSensor;
+
+            #if DEBUG_ENABLE
+            Serial.println(sensor.displayValue(measurement));
+            #endif
+        }
+        else
+        {
+            success = false;
+        }
+    }
+    
+    status.sensorOK = success;
+
+    dataSize = serialize(measurement, buffer, sizeof(buffer));
+}
+
+void handleBluetooth()
+{
+    bool success;
+    if (!bluetooth.isInitialized() || dataSize == 0)
+    {
+        status.bluetoothOK = false; // vraie erreur
+        return;
+    }
+
+    if (!bluetooth.hasConnectedClient())
+    {
+        status.bluetoothOK = true; // pas d'erreur, juste personne de connecté
+        return;
+    }
+
+    success = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
+
+    #if DEBUG_ENABLE
+    if (success) Serial.println("Data sent over Bluetooth.");
+    #endif
+
+    status.bluetoothOK = success;
+}
+
+void setAlarmManagerCallbacks()
+{
+    alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
+    {
+        storage.begin(Storage::STORAGE_NAMESPACE, false);
+        storage.putBool(Storage::alarmArmedKey, armed);
+        storage.putUInt(Storage::alarmTargetKey, targetEpoch);
+        storage.end();
+    });
+}
+
+void setWifiCallbacks()
+{
+   wifi.setConfigTarget(&deviceConfig);
+
+    wifi.setSensorInfoProvider([]() -> String
+    {
+        String json = "[";
+        for (int i = 0; i < sensorCount; i++)
+        {
+            if (i > 0) json += ",";
+            json += "\"" + String(sensors[i]->getName()) + "\"";
+        }
+        json += "]";
+        return json;
+    });
+
+
+   wifi.setOnConfigSaved([](const DeviceConfig& newDeviceConfig) 
+   {
+        storage.begin(Storage::STORAGE_NAMESPACE, false);
+
+        if (memcmp(newDeviceConfig.devEui, deviceConfig.devEui, sizeof(newDeviceConfig.devEui)) != 0)
+        {
+            storage.putBytes(Storage::devEUIKey, newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
+            memcpy(deviceConfig.devEui, newDeviceConfig.devEui, sizeof(deviceConfig.devEui));
+        }
+
+        if (memcmp(newDeviceConfig.appEui, deviceConfig.appEui, sizeof(newDeviceConfig.appEui)) != 0)
+        {
+            storage.putBytes(Storage::appEUIKey, newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
+            memcpy(deviceConfig.appEui, newDeviceConfig.appEui, sizeof(deviceConfig.appEui));
+        }
+
+        if (memcmp(newDeviceConfig.appKey, deviceConfig.appKey, sizeof(newDeviceConfig.appKey)) != 0)
+        {
+            storage.putBytes(Storage::appKeyKey, newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));   
+            memcpy(deviceConfig.appKey, newDeviceConfig.appKey, sizeof(deviceConfig.appKey));
+        }
+            
+        if (newDeviceConfig.bleDeviceName != deviceConfig.bleDeviceName)
+        {
+            storage.putString(Storage::bleNameKey, newDeviceConfig.bleDeviceName);
+            deviceConfig.bleDeviceName = newDeviceConfig.bleDeviceName;
+        }
+
+        if (newDeviceConfig.serviceUUID != deviceConfig.serviceUUID)
+        {
+            storage.putString(Storage::serviceUUIDKey, newDeviceConfig.serviceUUID);
+            deviceConfig.serviceUUID = newDeviceConfig.serviceUUID;
+        }
+
+        if (newDeviceConfig.characteristicUUID != deviceConfig.characteristicUUID)
+        {
+            storage.putString(Storage::characteristicUUIDKey, newDeviceConfig.characteristicUUID);
+            deviceConfig.characteristicUUID = newDeviceConfig.characteristicUUID;
+        }
+
+        if (newDeviceConfig.timeSyncUUID != deviceConfig.timeSyncUUID)
+        {
+            storage.putString(Storage::timeSyncUUIDKey, newDeviceConfig.timeSyncUUID);
+            deviceConfig.timeSyncUUID = newDeviceConfig.timeSyncUUID;
+        }
+
+        if (newDeviceConfig.alarmTargetUUID != deviceConfig.alarmTargetUUID)
+        {
+            storage.putString(Storage::alarmTargetUUIDKey, newDeviceConfig.alarmTargetUUID);
+            deviceConfig.alarmTargetUUID = newDeviceConfig.alarmTargetUUID;
+        }
+
+        if (newDeviceConfig.wifiApSSID != deviceConfig.wifiApSSID)
+        {
+            storage.putString(Storage::wifiApSSIDKey, newDeviceConfig.wifiApSSID);
+            deviceConfig.wifiApSSID = newDeviceConfig.wifiApSSID;
+        }
+
+        if (newDeviceConfig.wifiApPassword != deviceConfig.wifiApPassword)
+        {
+            storage.putString(Storage::wifiApPasswordKey, newDeviceConfig.wifiApPassword);
+            deviceConfig.wifiApPassword = newDeviceConfig.wifiApPassword;
+        }
+
+        if (newDeviceConfig.utcOffset != deviceConfig.utcOffset)
+        {
+            storage.putChar(Storage::utcOffsetKey, newDeviceConfig.utcOffset);
+            deviceConfig.utcOffset = newDeviceConfig.utcOffset;
+        }
+
+        if (newDeviceConfig.enabledSensorsMask != deviceConfig.enabledSensorsMask)
+        {
+            storage.putUInt(Storage::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
+            deviceConfig.enabledSensorsMask = newDeviceConfig.enabledSensorsMask;
+        }
+    
+        storage.end();
+    });
+}
+
+void setBluetoothCallbacks()
+{
+    bluetooth.setTimeSyncCallback([](uint32_t epoch)
+    {
+        systemClock.sync(epoch);
+    });
+
+    bluetooth.setAlarmTargetCallback([](uint32_t targetEpoch)
+    {
+        alarmManager.setAlarm(targetEpoch);
+    });
 }
