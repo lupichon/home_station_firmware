@@ -37,6 +37,7 @@ Storage storage;
 extern HardwareSerial Serial;
 BluetoothCommunication bluetooth;
 WiFiCommunication wifi;
+//ajout de lorawan
 
 // Declaration of elements for the interface with the user (LEDs, buttons, screens, etc.)
 StatusLED statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
@@ -71,7 +72,15 @@ Sensor* sensors[] =
     &VocNoxSensor       // Important: this sensor must be placed after the SCD41 (it needs temp and humidity)
 };
 
+Communication* communications[] = 
+{
+    &bluetooth,
+    &wifi,
+    &lorawan
+};
+
 int sensorCount = Sensor::getSensorCount();
+int commCount = sizeof(communications) / sizeof(communications[0]);
 
 // Constants for task timing
 constexpr unsigned long TASK_10_MS   = 10;
@@ -133,6 +142,7 @@ void setup()
     systemClock.configure(deviceConfig.utcOffset);
     wifi.configure(deviceConfig.wifiApSSID, deviceConfig.wifiApPassword);
     bluetooth.configure(deviceConfig.bleDeviceName, deviceConfig.serviceUUID, deviceConfig.characteristicUUID, deviceConfig.timeSyncUUID, deviceConfig.alarmTargetUUID);
+    //lorawan.configure(...)
     lorawan = LoRaWANCommunication(loraWANPins, deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey);    //TODO meme principe que les autres (confgure)
     lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
     {
@@ -143,14 +153,15 @@ void setup()
     setAlarmManagerCallbacks();
     setWifiCallbacks();
     setBluetoothCallbacks();
-
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
-    bluetooth.begin();
-    lorawan.begin();
-    wifi.begin();
+    //setLorawanCallbacks()
 
     alarmManager.begin(alarmArmed, alarmTargetEpoch);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
+    for (int i = 0; i < commCount; i++)
+    {
+        communications[i]->begin();
+    }
 
     #if DEBUG_ENABLE
     Serial.println("========  HomeStation Firmware  ========");
