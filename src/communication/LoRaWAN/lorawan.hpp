@@ -1,3 +1,10 @@
+/**
+ * @file    lorawan.hpp
+ * @brief   LoRaWAN communication interface for the HomeStation device.
+ * @author  Lucas Pichon
+ * @date    2026-07-29
+ */
+
 #pragma once
 
 #include <Arduino.h>

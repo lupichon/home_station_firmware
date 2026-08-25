@@ -1,9 +1,16 @@
+/**
+ * @file    wifi_config_page.hpp
+ * @brief   HTML page for configuring WiFi settings.
+ * @author  Lucas Pichon
+ * @date    2026-08-24
+ */
+
 #pragma once
 
 #include <Arduino.h>
 
 // ============================================================
-// HTML page (stored in flash)
+// HTML page 
 // ============================================================
 
 static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(

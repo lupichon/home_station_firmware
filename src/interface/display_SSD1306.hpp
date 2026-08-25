@@ -1,3 +1,10 @@
+/**
+ * @file    display_ssd1306.hpp
+ * @brief   SSD1306 OLED display interface for the HomeStation device.
+ * @author  Lucas Pichon
+ * @date    2026-07-28
+ */
+
 #pragma once
 
 #include <Arduino.h>
@@ -9,9 +16,17 @@
 #include "../core/gas_state.hpp"
 #include "../core/clock.hpp"
 
+// ============================================================
+// DisplaySSD1306 class definition
+// ============================================================
+
 class DisplaySSD1306
 {
+    // ── Public interface ────────────────────────────────────────────────────
     public:
+        /**
+         * @brief Pages available for cyclic display on the screen.
+         */
         enum class Page
         {
             CLOCK,
@@ -20,62 +35,196 @@ class DisplaySSD1306
             CO2,
             GASLEVEL,
             LUMINOSITY,
-            MOTION, 
-            SOUND, 
+            MOTION,
+            SOUND,
             OBSTACLE,
             VIBRATION,
-            PRESSURE, 
+            PRESSURE,
             VOC,
             NOX
         };
 
-        static constexpr uint8_t WIDTH = 128;
-        static constexpr uint8_t HEIGHT = 64;
-        static constexpr uint8_t I2C_ADDRESS = 0x3C;
-        static constexpr unsigned long SLEEP_TIMEOUT_MS = 60000;
+        static constexpr uint8_t WIDTH = 128;                       // Screen width in pixels
+        static constexpr uint8_t HEIGHT = 64;                       // Screen height in pixels
+        static constexpr uint8_t I2C_ADDRESS = 0x3C;                // I2C address of the SSD1306 controller
+        static constexpr unsigned long SLEEP_TIMEOUT_MS = 60000;    // Idle delay before the screen goes to sleep
 
+        /**
+         * @brief Constructor for DisplaySSD1306.
+         * @param clock Reference to the Clock instance used to render the clock page.
+         */
         DisplaySSD1306(Clock &clock);
 
+        /**
+         * @brief Initialize the SSD1306 controller and show the startup screen.
+         * @return true if initialization was successful, false otherwise.
+         */
         bool begin();
+
+        /**
+         * @brief Render the current page with the given measurement values.
+         *        Automatically puts the screen to sleep after SLEEP_TIMEOUT_MS
+         *        of inactivity. Does nothing while the screen is sleeping.
+         * @param measurement Latest set of sensor measurements to display.
+         */
         void update(const Measurement& measurement);
+
+        /**
+         * @brief Advance to the next page in the display cycle.
+         */
         void nextPage();
+
+        /**
+         * @brief Check whether the screen is currently in sleep mode.
+         * @return true if the screen is sleeping, false otherwise.
+         */
         bool isSleeping() const;
+
+        /**
+         * @brief Handle a user interaction with the display.
+         *        Wakes the screen if sleeping, otherwise advances to the next
+         *        page and resets the inactivity timer.
+         */
         void interact();
 
+    // ── Private members ───────────────────────────────────────────────────
     private:
-        Adafruit_SSD1306 screen;
-        Page currentPage;
-        bool sleeping;
-        unsigned long lastActivityTime;
-        Clock &clock;
+        Adafruit_SSD1306 screen;         // Underlying SSD1306 driver instance
+        Page currentPage;                // Page currently shown on screen
+        bool sleeping;                   // Whether the screen is currently sleeping
+        unsigned long lastActivityTime;  // Timestamp of the last user interaction
+        Clock &clock;                    // Reference to the shared Clock instance
 
+        /**
+         * @brief Render the CLOCK page (current time and date).
+         * @param epoch Current epoch time.
+         */
         void displayClock(uint32_t epoch);
+
+        /**
+         * @brief Render the TEMPERATURE page.
+         * @param value Temperature value in degrees Celsius.
+         */
         void displayTemperature(float value);
+
+        /**
+         * @brief Render the HUMIDITY page.
+         * @param value Relative humidity value in percent.
+         */
         void displayHumidity(float value);
+
+        /**
+         * @brief Render the CO2 page.
+         * @param value CO2 concentration in ppm.
+         */
         void displayCO2(uint16_t value);
+
+        /**
+         * @brief Render the VOC page.
+         * @param value VOC index value.
+         */
         void displayVocIndex(uint16_t value);
+
+        /**
+         * @brief Render the NOX page.
+         * @param value NOx index value.
+         */
         void displayNoxIndex(uint16_t value);
+
+        /**
+         * @brief Render the GASLEVEL page.
+         * @param value Raw gas sensor reading, converted to a GasState label.
+         */
         void displayGasLevel(uint16_t value);
+
+        /**
+         * @brief Render the LUMINOSITY page.
+         * @param value Luminosity value in lux.
+         */
         void displayLuminosity(float value);
+
+        /**
+         * @brief Render the PRESSURE page.
+         * @param value Atmospheric pressure value in hPa.
+         */
         void displayPressure(float value);
+
+        /**
+         * @brief Render the MOTION page.
+         * @param detected true if motion is currently detected, false otherwise.
+         */
         void displayMotion(bool detected);
+
+        /**
+         * @brief Render the SOUND page.
+         * @param detected true if sound is currently detected, false otherwise.
+         */
         void displaySound(bool detected);
+
+        /**
+         * @brief Render the OBSTACLE page.
+         * @param detected true if an obstacle is currently detected, false otherwise.
+         */
         void displayObstacle(bool detected);
+
+        /**
+         * @brief Render the VIBRATION page.
+         * @param detected true if vibration is currently detected, false otherwise.
+         */
         void displayVibration(bool detected);
+
+        /**
+         * @brief Draw the common page header (title text and separator line).
+         * @param title Title text to display at the top of the page.
+         */
         void displayTitle(const char* title);
+
+        /**
+         * @brief Render a titled numeric value with its unit, or "N/A" if NaN.
+         * @param title     Page title.
+         * @param unit      Unit suffix printed after the value.
+         * @param precision Number of decimal digits to display.
+         * @param value     Numeric value to display.
+         */
         void displayValue(String title, String unit, int precision, float value);
+
+        /**
+         * @brief Render a titled boolean state as one of two text labels.
+         * @param title             Page title.
+         * @param textIfDetected    Text shown when detected is true.
+         * @param textIfNotDetected Text shown when detected is false.
+         * @param detected          Boolean state to display.
+         */
         void displayValue(String title, String textIfDetected, String textIfNotDetected, bool detected);
 
+        /**
+         * @brief Turn the screen off and mark it as sleeping.
+         */
         void sleep();
+
+        /**
+         * @brief Turn the screen back on and reset the inactivity timer.
+         */
         void wake();
 };
 
+
+// ============================================================
+// implementations of DisplaySSD1306 methods
+// ============================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constructor
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline DisplaySSD1306::DisplaySSD1306(Clock &clock) : screen(WIDTH, HEIGHT, &Wire, -1),
       currentPage(Page::CLOCK), sleeping(false), lastActivityTime(0), clock(clock)
 {
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Initialization
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline bool DisplaySSD1306::begin()
 {
@@ -99,6 +248,9 @@ inline bool DisplaySSD1306::begin()
     return true;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendering
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void DisplaySSD1306::update(const Measurement& measurement)
 {
@@ -172,6 +324,9 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
     screen.display();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Page Navigation
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void DisplaySSD1306::nextPage()
 {
@@ -231,6 +386,9 @@ inline void DisplaySSD1306::nextPage()
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Common Drawing Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void DisplaySSD1306::displayTitle(const char* title)
 {
@@ -282,6 +440,10 @@ inline void DisplaySSD1306::displayValue(String title, String textIfDetected, St
         screen.println(textIfNotDetected);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pages
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void DisplaySSD1306::displayClock(uint32_t epoch)
 {
@@ -370,6 +532,10 @@ inline void DisplaySSD1306::displayPressure(float value)
 {
     displayValue("Pressure", "hPa", 1, value);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sleep Management
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline bool DisplaySSD1306::isSleeping() const
 {
