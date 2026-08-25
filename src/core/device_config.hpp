@@ -8,6 +8,10 @@ struct DeviceConfig
     // Time
     int8_t utcOffset = 0;
 
+    // Alarm
+    bool alarmArmed = false;
+    uint32_t alarmTargetEpoch = 0;
+
     // LoRaWAN
     uint8_t devEui[8];
     uint8_t appEui[8];
