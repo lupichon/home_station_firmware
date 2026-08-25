@@ -33,7 +33,7 @@ class Sensor
 
 inline Sensor::Sensor() : Sensor("", "")
 {
-    snprintf(sensorName, sizeof(sensorName), "Sensor_%d", sensorCount++);
+    snprintf(sensorName, sizeof(sensorName), "Sensor_%d", sensorCount-1);
 }
 
 inline Sensor::Sensor(const char* name) : Sensor(name, "")

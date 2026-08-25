@@ -80,7 +80,7 @@ Communication* communications[] =
 };
 
 int sensorCount = Sensor::getSensorCount();
-int commCount = sizeof(communications) / sizeof(communications[0]);
+int commCount = Communication::getCommunicationCount();
 
 // Constants for task timing
 constexpr unsigned long TASK_10_MS   = 10;
