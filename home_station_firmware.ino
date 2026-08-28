@@ -58,7 +58,7 @@ AlarmManager   alarmManager(buzzer, systemClock);
 // ==================== Communication ====================
 BluetoothCommunication bluetooth;
 WiFiCommunication      wifi;
-//LoRaWANCommunication   lorawan;
+LoRaWANCommunication   lorawan;
 
 Communication* communications[] =
 {
@@ -250,22 +250,15 @@ void initCommunication()
 
     if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
     {
-        LoRaWANCommunication::RadioPins loraWANPins = {
-        .nss  = SPI_NSS_PIN,
-        .rst  = SX1276_RST_PIN,
-        .dio0 = SX1276_DIO0_PIN,
-        .dio1 = SX1276_DIO1_PIN
-        };
-
-        //lorawan.configure(...) //TODO meme principe que les autres (confgure)
-
-        lorawan = LoRaWANCommunication(loraWANPins, deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey);
-        lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
-        {
-            return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
-        });
-        lorawan.setAutoUplinkInterval(60); // Send data every 60 seconds
-        //setLoRaWANCallbacks(); //TODO meme principe que les autres (setCallbacks)
+        lorawanPtr = &lorawan; // Pointer to the LoRaWANCommunication instance for LMIC callbacks
+        lorawan.configure(SPI_NSS_PIN, SX1276_RST_PIN, SX1276_DIO0_PIN, SX1276_DIO1_PIN, 
+                          deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey, 
+                          [](uint8_t* buf, uint8_t maxLen) -> uint8_t
+                          {
+                              return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
+                          },
+                          60);
+        setLoRaWANCallbacks(); 
         lorawan.begin();
     }
 
@@ -673,6 +666,54 @@ void setBluetoothCallbacks()
     });
 }
 
+// Set up the callbacks for LoRaWAN communication to handle join events and transmission completion
+void setLoRaWANCallbacks()
+{
+    #if DEBUG_ENABLE
+    lorawan.onJoining([]()
+    {
+        Serial.println("LoRaWAN : joining...");
+    });
+
+    lorawan.onJoined([]()
+    {
+        Serial.println("LoRaWAN : joined successfully!");
+    });
+
+    lorawan.onJoinFailed([]()
+    {
+        Serial.println("LoRaWAN : join failed.");
+    });
+
+    lorawan.onRejoinFailed([]()
+    {
+        Serial.println("LoRaWAN : rejoin failed.");
+    });
+
+    lorawan.onTxComplete([](bool hasDownlink)
+    {
+        Serial.println("LoRaWAN : transmission complete.");
+        if (hasDownlink)
+            Serial.println("LoRaWAN : downlink received.");
+    });
+
+    lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
+    {
+        Serial.printf("LoRaWAN : downlink on port %d (%d bytes)\n", port, length);
+    });
+
+    lorawan.onLinkDead([]()
+    {
+        Serial.println("LoRaWAN : link dead.");
+    });
+
+    lorawan.onLinkAlive([]()
+    {
+        Serial.println("LoRaWAN : link alive.");
+    });
+    #endif
+}
+
 // =================== Debug Functions ====================
 void printDebugInfo()
 {
@@ -689,12 +730,6 @@ void printDebugInfo()
         : "WiFi AP not started.");
 
     Serial.println(lorawan.isInitialized() ? "LoRaWAN used." : "LoRaWAN not used.");
-
-    lorawan.onJoined([]()  { Serial.println("LoRaWAN : Join reussi !"); });
-    lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
-    {
-        Serial.printf("Downlink recu sur port %d\n", port);
-    });
 
     Serial.println("--- I2C Scan ---");
     for (uint8_t addr = 1; addr < 127; addr++)
