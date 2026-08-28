@@ -23,4 +23,5 @@ struct Status
     bool sensorOK;      // Whether the sensor reading itself succeeded
     bool bluetoothOK;   // Whether the last transmission over Bluetooth succeeded
     bool lorawanOK;     // Whether the last transmission over LoRaWAN succeeded
+    bool wifiOK;        // Whether the last transmission over WiFi succeeded
 };

@@ -160,7 +160,8 @@ class Storage
         static constexpr const char* alarmArmedKey = "alarmArmed";
         static constexpr const char* alarmTargetKey = "alarmTarget";
         static constexpr const char* enabledSensorsMaskKey = "enSensMask";
-
+        static constexpr const char* enabledCommsMaskKey   = "enCommMask";
+        
     // ── Private members ───────────────────────────────────────────────────
     private:
         Preferences preferences;

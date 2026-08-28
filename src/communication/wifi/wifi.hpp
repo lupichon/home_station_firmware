@@ -209,6 +209,9 @@ inline void WiFiCommunication::handleGetConfig()
     json += ",\"enabledSensorsMask\":";
     json += String(deviceConfig->enabledSensorsMask);
 
+    json += ",\"enabledCommsMask\":";
+    json += String(deviceConfig->enabledCommsMask);
+
     json += ",\"devEui\":\"";
     json += bytesToHex(deviceConfig->devEui, sizeof(deviceConfig->devEui));
     json += "\"";
@@ -278,6 +281,7 @@ inline void WiFiCommunication::handlePostConfig()
     // Extract configuration parameters from the JSON document with default values
     int8_t utcOffset               = doc["utcOffset"] | -128; 
     uint16_t enabledSensorsMask    = doc["enabledSensorsMask"] | 0xFFFF;
+    uint8_t enabledCommsMask       = doc["enabledCommsMask"]   | 0x07;
     String devEui                  = doc["devEui"]             | "";
     String appEui                  = doc["appEui"]             | "";
     String appKey                  = doc["appKey"]             | "";
@@ -351,6 +355,7 @@ inline void WiFiCommunication::handlePostConfig()
     newDeviceConfig.wifiApSSID         = wifiApSSID;
     newDeviceConfig.wifiApPassword     = wifiApPassword;
     newDeviceConfig.enabledSensorsMask = enabledSensorsMask;
+    newDeviceConfig.enabledCommsMask   = enabledCommsMask;
     hexToBytes(devEui.c_str(), newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
     hexToBytes(appEui.c_str(), newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
     hexToBytes(appKey.c_str(), newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));

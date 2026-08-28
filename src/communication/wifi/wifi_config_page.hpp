@@ -410,6 +410,32 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
     </div>
 
     <!-- =====================================================
+         COMMUNICATIONS
+         ===================================================== -->
+    <div class="section">
+        <div class="section-title">Communications</div>
+
+        <label>
+            <input type="checkbox" id="commsBluetooth">
+            Bluetooth
+        </label>
+        <br>
+        <label>
+            <input type="checkbox" id="commsLora">
+            LoRaWAN
+        </label>
+        <br>
+        <label>
+            <input type="checkbox" id="commsWifi">
+            WiFi (Config Portal)
+        </label>
+        <p class="hint" style="color:#f87171;">
+            ⚠️ Disabling WiFi will make this configuration page unreachable after reboot.
+            To restart it, press the button 5 seconds.
+        </p>
+    </div>
+
+    <!-- =====================================================
          REBOOT NOTICE
          ===================================================== -->
 
@@ -594,7 +620,8 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             alarmTargetUUID:    document.getElementById('alarmTargetUUID').value.trim(),
             wifiApSSID:         document.getElementById('wifiApSSID').value.trim(),
             wifiApPassword:     document.getElementById('wifiApPassword').value,
-            enabledSensorsMask: getSensorsMask()
+            enabledSensorsMask: getSensorsMask(),
+            enabledCommsMask:   getCommsMask()
         };
 
         if (!validateConfig(config)) return;
@@ -652,6 +679,20 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             .forEach((cb, i) => { cb.checked = (mask & (1 << i)) !== 0; });
     }
 
+    function setCommsMask(mask) {
+        document.getElementById('commsBluetooth').checked = (mask & 0x01) !== 0;
+        document.getElementById('commsLora').checked      = (mask & 0x02) !== 0;
+        document.getElementById('commsWifi').checked      = (mask & 0x04) !== 0;
+    }
+
+    function getCommsMask() {
+        let mask = 0;
+        if (document.getElementById('commsBluetooth').checked) mask |= 0x01;
+        if (document.getElementById('commsLora').checked)      mask |= 0x02;
+        if (document.getElementById('commsWifi').checked)      mask |= 0x04;
+        return mask;
+    }
+
     function getSensorsMask() {
         let mask = 0;
         document.querySelectorAll('#sensorsList input[type=checkbox]')
@@ -680,6 +721,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 setValue('wifiApSSID',         config.wifiApSSID);
                 setValue('wifiApPassword',     config.wifiApPassword);
                 setSensorsMask(config.enabledSensorsMask ?? 0xFFFF);
+                setCommsMask(config.enabledCommsMask ?? 0x07);
             })
             .catch(() => showAlert('Unable to load configuration.', 'error'));
     }

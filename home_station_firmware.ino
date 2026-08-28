@@ -164,10 +164,10 @@ void loop()
     {
         last1000Ms = now;
         
-        status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
-
         handleMeasurements();
         handleBluetooth();
+        handleLorawanStatus();
+        handleWifiStatus();
     }
 }
 
@@ -213,6 +213,7 @@ void initStorage()
     deviceConfig.alarmTargetEpoch   = storage.getUInt(Storage::alarmTargetKey, 0);
     deviceConfig.utcOffset          = storage.getChar(Storage::utcOffsetKey,   0);
     deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(Storage::enabledSensorsMaskKey, 0xFFFF));
+    deviceConfig.enabledCommsMask   = static_cast<uint8_t>(storage.getUInt(Storage::enabledCommsMaskKey, 0x07));
 
     storage.end();
 }
@@ -233,41 +234,47 @@ void initAlarmManager()
 // Initialize communication interfaces: WiFi, Bluetooth, and LoRaWAN
 void initCommunication()
 {
-    LoRaWANCommunication::RadioPins loraWANPins = {
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    SPI .begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
+
+    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT))
+    {   
+        bluetooth.configure(deviceConfig.bleDeviceName, 
+                            deviceConfig.serviceUUID, 
+                            deviceConfig.characteristicUUID, 
+                            deviceConfig.timeSyncUUID, 
+                            deviceConfig.alarmTargetUUID);
+        setBluetoothCallbacks();
+        bluetooth.begin();
+    }
+
+    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+    {
+        LoRaWANCommunication::RadioPins loraWANPins = {
         .nss  = SPI_NSS_PIN,
         .rst  = SX1276_RST_PIN,
         .dio0 = SX1276_DIO0_PIN,
         .dio1 = SX1276_DIO1_PIN
-    };
+        };
 
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    SPI .begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
+        //lorawan.configure(...) //TODO meme principe que les autres (confgure)
 
-    wifi     .configure(deviceConfig.wifiApSSID, 
-                        deviceConfig.wifiApPassword);
-
-    bluetooth.configure(deviceConfig.bleDeviceName, 
-                        deviceConfig.serviceUUID, 
-                        deviceConfig.characteristicUUID, 
-                        deviceConfig.timeSyncUUID, 
-                        deviceConfig.alarmTargetUUID);
-    //lorawan.configure(...) //TODO meme principe que les autres (confgure)
-
-    lorawan = LoRaWANCommunication(loraWANPins, deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey);
-    lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
-    {
-        return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
-    });
-    lorawan.setAutoUplinkInterval(60); // Send data every 60 seconds
-
-    for (int i = 0; i < commCount; i++)
-    {
-        communications[i]->begin();
+        lorawan = LoRaWANCommunication(loraWANPins, deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey);
+        lorawan.setPayloadBuilder([](uint8_t* buf, uint8_t maxLen) -> uint8_t
+        {
+            return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
+        });
+        lorawan.setAutoUplinkInterval(60); // Send data every 60 seconds
+        //setLoRaWANCallbacks(); //TODO meme principe que les autres (setCallbacks)
+        lorawan.begin();
     }
 
-    setWifiCallbacks();
-    setBluetoothCallbacks();
-    //setLoRaWANCallbacks(); //TODO meme principe que les autres (setCallbacks)
+    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    {
+        wifi.configure(deviceConfig.wifiApSSID, deviceConfig.wifiApPassword);
+        setWifiCallbacks();
+        wifi.begin();
+    }
 }
 
 // Initialize all sensors based on the enabled sensors mask in the device configuration
@@ -275,7 +282,7 @@ void initSensors()
 {
     for(int i = 0; i < sensorCount; i++)
     {
-        if (!((deviceConfig.enabledSensorsMask >> i) & 0x01)) continue; 
+        if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i))) continue; 
 
         if(!sensors[i]->begin())
         {
@@ -317,14 +324,14 @@ void handleBuzzer()
 // Handle the sound sensor update if it is enabled in the device configuration
 void handleSoundSensor()
 {
-    if (!((deviceConfig.enabledSensorsMask >> 3) & 0x01)) return; 
+    if (!isSensorEnabled(deviceConfig.enabledSensorsMask, SensorsBit::MAX9814_BIT)) return; 
     soundSensor.update();
 }
 
 // Handle the WiFi communication loop
 void handleWifi()
 {
-    if (wifi.isInitialized())
+    if (wifi.isInitialized() && isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
     {
         wifi.loop();
     }
@@ -333,7 +340,7 @@ void handleWifi()
 // Handle the LoRaWAN communication loop
 void handleLoRaWAN()
 {
-    if (lorawan.isInitialized())
+    if (lorawan.isInitialized() && isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
     {
         lorawan.loop();
     }
@@ -352,7 +359,7 @@ void handleLED()
     {
         statusLED.setState(StatusLED::State::WARNING_SENSOR);
     }
-    else if (!status.bluetoothOK || !status.lorawanOK)
+    else if (!status.bluetoothOK || !status.lorawanOK || !status.wifiOK)
     {
         statusLED.setState(StatusLED::State::WARNING_COMMUNICATION);
     }
@@ -372,8 +379,11 @@ void handleLED()
 // Handle the button press and hold events, including reboot on long press
 void handleButton()
 {
-    static unsigned long pressStartMs    = 0;
-    static bool          rebootTriggered = false;
+    static unsigned long pressStartMs = 0;
+    static bool wifiTriggered = false;
+    static bool rebootTriggered = false;
+
+    constexpr unsigned long START_WIFI = 5000;
     constexpr unsigned long REBOOT_HOLD_TIME_MS = 10000;
 
     button.update();
@@ -394,13 +404,36 @@ void handleButton()
     {
         if (pressStartMs == 0)
         {
-            pressStartMs = millis(); 
+            pressStartMs = millis();
+            wifiTriggered = false;
+            rebootTriggered = false;
         }
-        else if (!rebootTriggered && millis() - pressStartMs >= REBOOT_HOLD_TIME_MS)
+
+        unsigned long holdTime = millis() - pressStartMs;
+
+        if (!wifiTriggered && !wifi.isInitialized() && holdTime >= START_WIFI)
+        {
+            wifiTriggered = true;
+
+            wifi.configure(deviceConfig.wifiApSSID,deviceConfig.wifiApPassword);
+            setWifiCallbacks();
+            wifi.begin();
+            deviceConfig.enabledCommsMask |= static_cast<uint8_t>(CommsBit::WIFI_BIT);
+            storage.begin(Storage::STORAGE_NAMESPACE, false);
+            storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(deviceConfig.enabledCommsMask));
+            storage.end();
+
+            #if DEBUG_ENABLE
+            Serial.println("WiFi started");
+            #endif
+        }
+
+
+        if (!rebootTriggered && holdTime >= REBOOT_HOLD_TIME_MS)
         {
             rebootTriggered = true;
             #if DEBUG_ENABLE
-            Serial.println("Bouton maintenu 10s : reboot du systeme.");
+            Serial.println("Rebooting system due to long button press.");
             #endif
             delay(1000);
             ESP.restart();
@@ -408,10 +441,12 @@ void handleButton()
     }
     else
     {
-        pressStartMs    = 0;
+        pressStartMs = 0;
+        wifiTriggered = false;
         rebootTriggered = false;
     }
 }
+
 // Handle the measurement acquisition from all enabled sensors
 void handleMeasurements()
 {
@@ -421,7 +456,7 @@ void handleMeasurements()
     measurement.timestamp = systemClock.now();
     for(int i = 0; i < sensorCount; i++)
     {
-        bool sensorEnabled = (deviceConfig.enabledSensorsMask >> i) & 0x01;
+        bool sensorEnabled = isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i));
         if (!sensorEnabled) continue;
 
         Sensor& sensor = *sensors[i];
@@ -449,26 +484,58 @@ void handleMeasurements()
 // Handle the Bluetooth communication loop, including sending data to connected clients
 void handleBluetooth()
 {
-    bool success;
+    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT))
+    {
+        status.bluetoothOK = true;
+        return;
+    }
+
     if (!bluetooth.isInitialized() || dataSize == 0)
     {
-        status.bluetoothOK = false; // vraie erreur
+        status.bluetoothOK = false; 
         return;
     }
 
     if (!bluetooth.hasConnectedClient())
     {
-        status.bluetoothOK = true; // pas d'erreur, juste personne de connecté
+        status.bluetoothOK = true; 
         return;
     }
 
-    success = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
+    status.bluetoothOK = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
 
     #if DEBUG_ENABLE
-    if (success) Serial.println("Data sent over Bluetooth.");
+    if (status.bluetoothOK) 
+    {
+        Serial.println("Data sent over Bluetooth.");
+    }
+    else
+    {
+        Serial.println("Failed to send data over Bluetooth.");
+    }
     #endif
+}
 
-    status.bluetoothOK = success;
+void handleLorawanStatus()
+{
+    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+    {
+        status.lorawanOK = true; 
+        return;
+    }
+
+    status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
+}
+
+void handleWifiStatus()
+{
+    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    {
+        status.wifiOK = true; 
+        return;
+    }
+
+    status.wifiOK = wifi.isInitialized();
 }
 
 // =================== Callback Setup Functions ====================
@@ -581,6 +648,12 @@ void setWifiCallbacks()
             storage.putUInt(Storage::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
             deviceConfig.enabledSensorsMask = newDeviceConfig.enabledSensorsMask;
         }
+
+        if (newDeviceConfig.enabledCommsMask != deviceConfig.enabledCommsMask)
+        {
+            storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
+            deviceConfig.enabledCommsMask = newDeviceConfig.enabledCommsMask;
+        }
     
         storage.end();
     });
@@ -653,5 +726,6 @@ void printDebugInfo()
     Serial.print("alarmTargetEpoch: ");   Serial.println(deviceConfig.alarmTargetEpoch);
     Serial.print("utcOffset: ");          Serial.println(deviceConfig.utcOffset);
     Serial.print("enabledSensorsMask: "); Serial.println(deviceConfig.enabledSensorsMask, BIN);
+    Serial.print("enabledCommsMask: ");   Serial.println(deviceConfig.enabledCommsMask, BIN);
     Serial.println("========================================");
 }
