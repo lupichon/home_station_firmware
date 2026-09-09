@@ -38,6 +38,7 @@ struct DeviceConfig
     String characteristicUUID;   // BLE characteristic UUID for measurements
     String timeSyncUUID;         // BLE characteristic UUID for time synchronization
     String alarmTargetUUID;      // BLE characteristic UUID for alarm target
+    String wifiControlUUID;      // BLE characteristic UUID for WiFi control
 
     // ── WiFi AP ──────────────────────────────────────────────────────────
     String wifiApSSID;       // SSID of the WiFi access point

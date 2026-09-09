@@ -111,6 +111,7 @@ inline bool SCD41Sensor::begin()
     // Reset the sensor measurement state before starting periodic measurements
     sensor.wakeUp();
     sensor.stopPeriodicMeasurement();
+    delay(500);
     sensor.reinit();
 
     // Allow the sensor to complete its initialization

@@ -145,22 +145,23 @@ class Storage
          */
         size_t getBytesLength(const char* key);
 
-        static constexpr const char* STORAGE_NAMESPACE = "HomeStation";
-        static constexpr const char* devEUIKey = "devEui";
-        static constexpr const char* appEUIKey = "appEui";
-        static constexpr const char* appKeyKey = "appKey";
-        static constexpr const char* bleNameKey = "bleName";
-        static constexpr const char* serviceUUIDKey = "serUUID";
-        static constexpr const char* characteristicUUIDKey = "charUUID";
-        static constexpr const char* timeSyncUUIDKey = "tSynUUID";
-        static constexpr const char* alarmTargetUUIDKey = "alTaUUID";
-        static constexpr const char* wifiApSSIDKey = "apSSID";
-        static constexpr const char* wifiApPasswordKey = "apPass";
-        static constexpr const char* utcOffsetKey = "utcOffset";
-        static constexpr const char* alarmArmedKey = "alarmArmed";
-        static constexpr const char* alarmTargetKey = "alarmTarget";
-        static constexpr const char* enabledSensorsMaskKey = "enSensMask";
-        static constexpr const char* enabledCommsMaskKey   = "enCommMask";
+        static constexpr const char* STORAGE_NAMESPACE      = "HomeStation";
+        static constexpr const char* devEUIKey              = "devEui";
+        static constexpr const char* appEUIKey              = "appEui";
+        static constexpr const char* appKeyKey              = "appKey";
+        static constexpr const char* bleNameKey             = "bleName";
+        static constexpr const char* serviceUUIDKey         = "serUUID";
+        static constexpr const char* characteristicUUIDKey  = "charUUID";
+        static constexpr const char* timeSyncUUIDKey        = "tSynUUID";
+        static constexpr const char* alarmTargetUUIDKey     = "alTaUUID";
+        static constexpr const char* wifiApSSIDKey          = "apSSID";
+        static constexpr const char* wifiApPasswordKey      = "apPass";
+        static constexpr const char* utcOffsetKey           = "utcOffset";
+        static constexpr const char* alarmArmedKey          = "alarmArmed";
+        static constexpr const char* alarmTargetKey         = "alarmTarget";
+        static constexpr const char* enabledSensorsMaskKey  = "enSensMask";
+        static constexpr const char* enabledCommsMaskKey    = "enCommMask";
+        static constexpr const char* wifiControlUUIDKey     = "wiCoUUID";
         
     // ── Private members ───────────────────────────────────────────────────
     private:

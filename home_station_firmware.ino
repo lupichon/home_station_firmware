@@ -206,6 +206,7 @@ void initStorage()
     loadOrCreateConfig(storage, Storage::characteristicUUIDKey,  "Characteristic UUID",              deviceConfig.characteristicUUID,36);
     loadOrCreateConfig(storage, Storage::timeSyncUUIDKey,        "Time Sync Characteristic UUID",    deviceConfig.timeSyncUUID,      36);
     loadOrCreateConfig(storage, Storage::alarmTargetUUIDKey,     "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID,   36);
+    loadOrCreateConfig(storage, Storage::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
     loadOrCreateConfig(storage, Storage::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
     loadOrCreateConfig(storage, Storage::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
 
@@ -243,7 +244,8 @@ void initCommunication()
                             deviceConfig.serviceUUID, 
                             deviceConfig.characteristicUUID, 
                             deviceConfig.timeSyncUUID, 
-                            deviceConfig.alarmTargetUUID);
+                            deviceConfig.alarmTargetUUID, 
+                            deviceConfig.wifiControlUUID);
         setBluetoothCallbacks();
         bluetooth.begin();
     }
@@ -529,7 +531,7 @@ void handleLorawanStatus()
 
 void handleWifiStatus()
 {
-    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) || wifi.isSleeping())
     {
         status.wifiOK = true; 
         return;
@@ -657,6 +659,50 @@ void setWifiCallbacks()
     
         storage.end();
     });
+
+    wifi.setMeasurementProvider([]() -> String
+    {
+        auto floatField = [](const char* key, float val) -> String
+        {
+            String s = "\"";
+            s += key;
+            s += "\":";
+            s += isnan(val) ? "null" : String(val, 2);
+            return s;
+        };
+
+        auto intField = [](const char* key, uint16_t val) -> String
+        {
+            String s = "\"";
+            s += key;
+            s += "\":";
+            s += (val != (uint16_t)NAN) ? String(val) : "null";
+            return s;
+        };
+
+        auto boolField = [](const char* key, bool val) -> String
+        {
+            return "\"" + String(key) + "\":" + String(val ? 1 : 0);
+        };
+
+        String json = "{";
+        json += "\"timestamp\":" + String(measurement.timestamp) + ",";
+        json += floatField("temperature", measurement.temperature) + ",";
+        json += floatField("humidity",    measurement.humidity)    + ",";
+        json += floatField("luminosity",  measurement.luminosity)  + ",";
+        json += floatField("pressure",    measurement.pressure)    + ",";
+        json += intField("co2",           measurement.co2)         + ",";
+        json += intField("gasRaw",        measurement.gasRaw)      + ",";
+        json += intField("vocIndex",      measurement.vocIndex)    + ",";
+        json += intField("noxIndex",      measurement.noxIndex)    + ",";
+        json += boolField("motion",       measurement.motion) + ",";
+        json += boolField("sound",        measurement.sound) + ",";
+        json += boolField("obstacle",     measurement.obstacle) + ",";
+        json += boolField("vibration",    measurement.vibration);
+        json += "}";
+
+        return json;
+    });
 }
 
 // Set up the callbacks for Bluetooth communication to handle time synchronization and alarm target updates
@@ -670,6 +716,21 @@ void setBluetoothCallbacks()
     bluetooth.setAlarmTargetCallback([](uint32_t targetEpoch)
     {
         alarmManager.setAlarm(targetEpoch);
+    });
+
+    bluetooth.setWifiControlCallback([](bool enable)
+    {
+        if (enable)
+        {
+            if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+            {
+                wifi.begin();
+            }
+        }
+        else
+        {
+            wifi.stop();
+        }
     });
 }
 

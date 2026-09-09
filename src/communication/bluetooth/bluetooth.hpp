@@ -28,6 +28,7 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
         String characteristicUUID;  // Bluetooth characteristic UUID for measurements
         String timeSyncUUID;        // Bluetooth characteristic UUID for time synchronization
         String alarmTargetUUID;     // Bluetooth characteristic UUID for alarm target
+        String WifiControlUUID;     // Bluetooth characteristic UUID for WiFi control
 
         BLEServer* server;      // Pointer to the BLE server
         BLEService* service;    // Pointer to the BLE service
@@ -35,9 +36,11 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
         BLECharacteristic* measurementCharacteristic;   // Pointer to the BLE characteristic for measurements
         BLECharacteristic* timeSyncCharacteristic;      // Pointer to the BLE characteristic for time synchronization
         BLECharacteristic* alarmTargetCharacteristic;   // Pointer to the BLE characteristic for alarm target
+        BLECharacteristic* wifiControlCharacteristic;   // Pointer to the BLE characteristic for WiFi control
 
         std::function<void(uint32_t)> onTimeSyncReceived;       // Callback for time synchronization
         std::function<void(uint32_t)> onAlarmTargetReceived;    // Callback for alarm target updates
+        std::function<void(bool)>     onWifiControlReceived;    // Callback for WiFi control updates
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
@@ -53,8 +56,9 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
          * @param characteristicUUID BLE characteristic UUID for measurements.
          * @param timeSyncUUID       BLE characteristic UUID for time synchronization.
          * @param alarmTargetUUID    BLE characteristic UUID for alarm target.
+         * @param WifiControlUUID    BLE characteristic UUID for WiFi control.
          */
-        void configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID);
+        void configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID, const String& WifiControlUUID);
 
         /**
          * @brief Initialize the Bluetooth communication.
@@ -87,6 +91,12 @@ class BluetoothCommunication : public Communication, public BLEServerCallbacks, 
          * @param cb Callback function to handle alarm target updates.
          */
         void setAlarmTargetCallback(std::function<void(uint32_t)> cb);
+        
+        /**
+         * @brief Set the callback for WiFi control updates.
+         * @param cb Callback function to handle WiFi control updates.
+         */
+        void setWifiControlCallback(std::function<void(bool)> cb);
 
         void onConnect(BLEServer* server) override;
         void onDisconnect(BLEServer* server) override;
@@ -117,7 +127,7 @@ inline BluetoothCommunication::BluetoothCommunication()
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-inline void BluetoothCommunication::configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID)
+inline void BluetoothCommunication::configure(const String& deviceName, const String& serviceUUID, const String& characteristicUUID, const String& timeSyncUUID, const String& alarmTargetUUID, const String& WifiControlUUID)
 {
     // Store the provided configuration parameters
     this->deviceName = deviceName;
@@ -125,6 +135,7 @@ inline void BluetoothCommunication::configure(const String& deviceName, const St
     this->characteristicUUID = characteristicUUID;
     this->timeSyncUUID = timeSyncUUID;
     this->alarmTargetUUID = alarmTargetUUID;
+    this->WifiControlUUID = WifiControlUUID;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +183,14 @@ inline bool BluetoothCommunication::begin()
     );
     if (alarmTargetCharacteristic == nullptr) return false;
     alarmTargetCharacteristic->setCallbacks(this);
+
+    // Create the BLE characteristic for WiFi control with write property
+    wifiControlCharacteristic = service->createCharacteristic(
+        BLEUUID(WifiControlUUID.c_str()),
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    if (wifiControlCharacteristic == nullptr) return false;
+    wifiControlCharacteristic->setCallbacks(this);
 
     // Start the BLE service
     service->start();
@@ -239,6 +258,12 @@ inline void BluetoothCommunication::setAlarmTargetCallback(std::function<void(ui
     onAlarmTargetReceived = cb;
 }
 
+inline void BluetoothCommunication::setWifiControlCallback(std::function<void(bool)> cb)
+{
+    // Store the provided callback function for WiFi control
+    onWifiControlReceived = cb;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BLE Server Callbacks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -285,6 +310,16 @@ inline void BluetoothCommunication::onWrite(BLECharacteristic* characteristic)
         if (onAlarmTargetReceived)  // Call the callback function for alarm target updates if it is set
         {
             onAlarmTargetReceived(targetEpoch);
+        }
+    }
+
+    else if (characteristic == wifiControlCharacteristic) // Check if the written characteristic is for WiFi control
+    {
+        if (value.length() != 1) return; 
+        
+        if (onWifiControlReceived)
+        {
+            onWifiControlReceived(value[0] == 1);
         }
     }
 }

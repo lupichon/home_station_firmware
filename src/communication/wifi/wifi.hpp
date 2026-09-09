@@ -34,6 +34,11 @@ class WiFiCommunication : public Communication
 
         std::function<void(const DeviceConfig&)> onConfigSaved; // Callback function to be called when configuration is saved
         std::function<String()> sensorInfoProvider;             // Callback function to provide sensor information in JSON format
+        std::function<String()> measurementProvider;            // Callback to provide current measurement as JSON
+
+        unsigned long lastClientSeenMillis; // Timestamp of the last connected client
+        static constexpr unsigned long WIFI_TIMEOUT_MS = 300000; // WIFI timeout (5 minutes)
+        bool sleep; // Flag indicating if the WiFi is currently in sleep mode (off after timeout)
 
         // HTTP route handlers
         void handleRoot();
@@ -41,6 +46,7 @@ class WiFiCommunication : public Communication
         void handlePostConfig();
         void handleNotFound();
         void handleGetSensors();
+        void handleGetMeasurement();
 
     // ── Public interface ──────────────────────────────────────────────────
     public:
@@ -80,6 +86,17 @@ class WiFiCommunication : public Communication
         bool hasConnectedClient() const; 
 
         /**
+         * @brief Check if the WiFi communication is currently in sleep mode (off after a timeout).
+         * @return true if the WiFi is sleeping, false otherwise.
+         */
+        bool isSleeping() const;
+
+        /**
+         * @brief Stop the WiFi Access Point and disconnect all clients.
+         */
+        void stop(); 
+
+        /**
          * @brief Set the target DeviceConfig structure to be used for configuration.
          * @param config Pointer to the DeviceConfig structure.
          */
@@ -96,6 +113,12 @@ class WiFiCommunication : public Communication
          * @param cb Callback function that returns a String containing sensor information in JSON format.
          */
         void setSensorInfoProvider(std::function<String()> cb);
+
+        /**
+         * @brief Set a callback function to provide the current measurement in JSON format.
+         * @param cb Callback function that returns a String containing the current measurement in JSON format.
+         */
+        void setMeasurementProvider(std::function<String()> cb);
 };
 
 
@@ -111,6 +134,8 @@ class WiFiCommunication : public Communication
 inline WiFiCommunication::WiFiCommunication()
     : server(80), 
       deviceConfig(nullptr),
+      lastClientSeenMillis(0),
+      sleep(false),
       Communication()
 {
 }
@@ -144,16 +169,18 @@ inline bool WiFiCommunication::begin()
     }
 
     // Route registration
-    server.on("/",           HTTP_GET,  [this]() { handleRoot();      });
-    server.on("/api/config", HTTP_GET,  [this]() { handleGetConfig(); });
-    server.on("/api/config", HTTP_POST, [this]() { handlePostConfig();});
-    server.on("/api/sensors", HTTP_GET, [this]() { handleGetSensors(); });
-    server.onNotFound(       [this]() { handleNotFound(); });
+    server.on("/",                  HTTP_GET,  [this]() { handleRoot();      });
+    server.on("/api/config",        HTTP_GET,  [this]() { handleGetConfig(); });
+    server.on("/api/config",        HTTP_POST, [this]() { handlePostConfig();});
+    server.on("/api/sensors",       HTTP_GET,  [this]() { handleGetSensors(); });
+    server.on("/api/measurement",   HTTP_GET,  [this]() { handleGetMeasurement(); });
+    server.onNotFound(                         [this]() { handleNotFound(); });
 
     // Start the HTTP server
     server.begin();
 
     initialized = true;
+    sleep = false;
     return true;
 }
 
@@ -166,6 +193,15 @@ inline void WiFiCommunication::loop()
 {
     // Handle incoming HTTP requests
     server.handleClient();
+
+    if (hasConnectedClient())
+    {
+        lastClientSeenMillis = millis();
+    }
+    else if (lastClientSeenMillis > 0 && millis() - lastClientSeenMillis > WIFI_TIMEOUT_MS)
+    {
+        stop();
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +280,10 @@ inline void WiFiCommunication::handleGetConfig()
     json += deviceConfig->alarmTargetUUID;
     json += "\"";
 
+    json += ",\"wifiControlUUID\":\"";
+    json += deviceConfig->wifiControlUUID;
+    json += "\"";
+
     json += ",\"wifiApSSID\":\"";
     json += deviceConfig->wifiApSSID;
     json += "\"";
@@ -290,6 +330,7 @@ inline void WiFiCommunication::handlePostConfig()
     String characteristicUUID      = doc["characteristicUUID"] | "";
     String timeSyncUUID            = doc["timeSyncUUID"]       | "";
     String alarmTargetUUID         = doc["alarmTargetUUID"]    | "";
+    String wifiControlUUID         = doc["wifiControlUUID"]       | "";
     String wifiApSSID              = doc["wifiApSSID"]         | "";
     String wifiApPassword          = doc["wifiApPassword"]     | "";
 
@@ -325,7 +366,7 @@ inline void WiFiCommunication::handlePostConfig()
     }
 
     if (serviceUUID.length() == 0 || characteristicUUID.length() == 0 ||
-        timeSyncUUID.length() == 0 || alarmTargetUUID.length() == 0)
+        timeSyncUUID.length() == 0 || alarmTargetUUID.length() == 0 || wifiControlUUID.length() == 0)
     {
         server.send(400, "application/json", "{\"ok\":false,\"error\":\"Bluetooth UUID fields cannot be empty\"}");
         return;
@@ -352,6 +393,7 @@ inline void WiFiCommunication::handlePostConfig()
     newDeviceConfig.characteristicUUID = characteristicUUID;
     newDeviceConfig.timeSyncUUID       = timeSyncUUID;
     newDeviceConfig.alarmTargetUUID    = alarmTargetUUID;
+    newDeviceConfig.wifiControlUUID    = wifiControlUUID;
     newDeviceConfig.wifiApSSID         = wifiApSSID;
     newDeviceConfig.wifiApPassword     = wifiApPassword;
     newDeviceConfig.enabledSensorsMask = enabledSensorsMask;
@@ -386,6 +428,16 @@ inline void WiFiCommunication::handleGetSensors()
     server.send(200, "application/json", sensorInfoProvider());
 }
 
+inline void WiFiCommunication::handleGetMeasurement()
+{
+    if (!measurementProvider)
+    {
+        server.send(200, "application/json", "{}");
+        return;
+    }
+    server.send(200, "application/json", measurementProvider());
+}
+
 inline bool WiFiCommunication::hasConnectedClient() const 
 { 
     // Check if the WiFi communication is initialized and if there is at least one connected client to the WiFi Access Point
@@ -394,6 +446,23 @@ inline bool WiFiCommunication::hasConnectedClient() const
         return false;
     }
     return WiFi.softAPgetStationNum() > 0;
+}
+
+inline bool WiFiCommunication::isSleeping() const
+{
+    // Check if the WiFi communication is currently in sleep mode (off after a timeout)
+    return sleep;
+}
+
+inline void WiFiCommunication::stop()
+{
+    // Stop the WiFi Access Point and disconnect all clients
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    server.stop();
+    initialized = false;
+    sleep = true;
+    lastClientSeenMillis = 0;
 }
 
 inline void WiFiCommunication::setSensorInfoProvider(std::function<String()> cb)
@@ -412,4 +481,10 @@ inline void WiFiCommunication::setOnConfigSaved(std::function<void(const DeviceC
 {
     // Set the callback function to be called when the configuration is saved
     onConfigSaved = cb;
+}
+
+inline void WiFiCommunication::setMeasurementProvider(std::function<String()> cb)
+{
+    // Set the callback function to provide the current measurement in JSON format
+    measurementProvider = cb;
 }

@@ -360,6 +360,18 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             >
         </div>
 
+        <div class="field">
+            <label for="wifiControlUUID">WiFi Control Characteristic UUID</label>
+            <input
+                type="text"
+                id="wifiControlUUID"
+                name="wifiControlUUID"
+                maxlength="36"
+                autocomplete="off"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            >
+        </div>
+
     </div>
 
 
@@ -525,6 +537,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 setValue('characteristicUUID',config.characteristicUUID);
                 setValue('timeSyncUUID',      config.timeSyncUUID);
                 setValue('alarmTargetUUID',   config.alarmTargetUUID);
+                setValue('wifiControlUUID',    config.wifiControlUUID);
                 setValue('wifiApSSID',        config.wifiApSSID);
                 setValue('wifiApPassword',    config.wifiApPassword);
             })
@@ -573,7 +586,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
         }
         markInvalid('bleDeviceName', false);
 
-        for (const field of ['serviceUUID', 'characteristicUUID', 'timeSyncUUID', 'alarmTargetUUID']) {
+        for (const field of ['serviceUUID', 'characteristicUUID', 'timeSyncUUID', 'alarmTargetUUID', 'wifiControlUUID']) {
             if (config[field].length === 0) {
                 markInvalid(field, true);
                 showAlert('Bluetooth UUID fields cannot be empty.', 'error');
@@ -618,6 +631,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             characteristicUUID: document.getElementById('characteristicUUID').value.trim(),
             timeSyncUUID:       document.getElementById('timeSyncUUID').value.trim(),
             alarmTargetUUID:    document.getElementById('alarmTargetUUID').value.trim(),
+            wifiControlUUID:    document.getElementById('wifiControlUUID').value.trim(),
             wifiApSSID:         document.getElementById('wifiApSSID').value.trim(),
             wifiApPassword:     document.getElementById('wifiApPassword').value,
             enabledSensorsMask: getSensorsMask(),
@@ -718,6 +732,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 setValue('characteristicUUID', config.characteristicUUID);
                 setValue('timeSyncUUID',       config.timeSyncUUID);
                 setValue('alarmTargetUUID',    config.alarmTargetUUID);
+                setValue('wifiControlUUID',    config.wifiControlUUID);
                 setValue('wifiApSSID',         config.wifiApSSID);
                 setValue('wifiApPassword',     config.wifiApPassword);
                 setSensorsMask(config.enabledSensorsMask ?? 0xFFFF);
