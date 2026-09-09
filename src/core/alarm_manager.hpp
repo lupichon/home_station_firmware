@@ -144,6 +144,7 @@ inline void AlarmManager::setAlarm(uint32_t newTargetEpoch)
     {
         // A target of 0 simply stops any ongoing buzzing without arming a new alarm
         buzzer.stop();
+        clearAlarm();
         return;
     }
 

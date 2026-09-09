@@ -40,6 +40,7 @@ class LoRaWANCommunication : public Communication
         using LinkAliveCallback     = void (*)();
         using RxStartCallback       = void (*)();
         using JoiningCallback       = void (*)();
+        using BeforeUplinkCallback  = void (*)();
 
         /**
          * @brief Constructor for LoRaWANCommunication.
@@ -88,6 +89,14 @@ class LoRaWANCommunication : public Communication
         bool sendUplink(const uint8_t* payload, uint8_t length, uint8_t port = 1, bool confirmed = false);
 
         /**
+         * @brief Generic Communication interface implementation.
+         * @param data Pointer to the data buffer to send.
+         * @param size Size of the data to send in bytes.
+         * @return true if the message was queued for transmission, false otherwise.
+         */
+        bool send(uint8_t* data, size_t size) override;
+
+        /**
          * @brief Check if the device has successfully joined the LoRaWAN network.
          * @return true if joined, false otherwise.
          */
@@ -108,6 +117,7 @@ class LoRaWANCommunication : public Communication
         void onLinkAlive    (LinkAliveCallback    cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
         void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
         void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join process
+        void onBeforeUplink (BeforeUplinkCallback cb) { beforeUplinkCb = cb;  } // Callback for before an automatic uplink transmission is sent
 
     private:
         uint8_t nssPin;     // SPI Chip Select pin for the LoRa module
@@ -135,6 +145,7 @@ class LoRaWANCommunication : public Communication
         RxStartCallback      rxStartCb       = nullptr;
         JoiningCallback      joiningCb       = nullptr;
         LinkAliveCallback    linkAliveCb     = nullptr;
+        BeforeUplinkCallback beforeUplinkCb   = nullptr;
 
         osjob_t sendjob;    // Job structure for scheduling automatic uplink transmissions
 
@@ -175,7 +186,7 @@ class LoRaWANCommunication : public Communication
 // Implementation of LoRaWANCommunication methods
 // ============================================================
 
-extern LoRaWANCommunication* lorawanPtr;    // Pointer to the LoRaWANCommunication instance for LMIC callbacks
+inline LoRaWANCommunication* lorawanPtr = nullptr;    // Pointer to the LoRaWANCommunication instance for LMIC callbacks
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Credentials configuration
@@ -213,7 +224,7 @@ extern "C"
 inline LoRaWANCommunication::LoRaWANCommunication()
     : Communication()
 {
-
+    lorawanPtr = this;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,11 +342,26 @@ inline bool LoRaWANCommunication::sendUplink(
     return true;
 }
 
+inline bool LoRaWANCommunication::send(uint8_t* data, size_t size)
+{
+    if (data == nullptr || size == 0 || size > MAX_PAYLOAD_LEN)
+    {
+        return false;
+    }
+
+    return sendUplink(data, static_cast<uint8_t>(size), 1, false);
+}
+
 inline void LoRaWANCommunication::handleAutoSend()
 {
     if (!payloadBuilder || isTxPending())
     {
         return;
+    }
+
+    if (beforeUplinkCb)
+    {
+        beforeUplinkCb();
     }
 
     uint8_t buffer[MAX_PAYLOAD_LEN];

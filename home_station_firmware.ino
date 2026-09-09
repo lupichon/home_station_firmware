@@ -164,7 +164,13 @@ void loop()
     {
         last1000Ms = now;
         
-        handleMeasurements();
+        if ((isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT)
+                            && bluetooth.hasConnectedClient())
+                            || !screen.isSleeping()
+                            || DEBUG_ENABLE)
+        {
+            handleMeasurements();
+        }
         handleBluetooth();
         handleLorawanStatus();
         handleWifiStatus();
@@ -730,6 +736,11 @@ void setBluetoothCallbacks()
 // Set up the callbacks for LoRaWAN communication to handle join events and transmission completion
 void setLoRaWANCallbacks()
 {
+    lorawan.onBeforeUplink([]()
+    {
+        handleMeasurements();
+    });
+
     #if DEBUG_ENABLE
     lorawan.onJoining([]()
     {
