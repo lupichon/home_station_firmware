@@ -23,140 +23,267 @@ extern "C"
     void onEvent(ev_t event);
 }
 
+// ============================================================
+// LoRaWANCommunication class definition
+// ============================================================
+
 class LoRaWANCommunication : public Communication
 {
     public:
-        struct RadioPins
-        {
-            uint8_t nss;
-            uint8_t rst;
+        using JoinedCallback        = void (*)();
+        using DownlinkCallback      = void (*)(uint8_t port, const uint8_t* data, uint8_t length);
+        using PayloadBuilder        = uint8_t (*)(uint8_t* buffer, uint8_t maxLength);
+        using TxCompleteCallback    = void (*)(bool hasDownlink);
+        using JoinFailedCallback    = void (*)();
+        using RejoinFailedCallback  = void (*)();
+        using LinkDeadCallback      = void (*)();
+        using LinkAliveCallback     = void (*)();
+        using RxStartCallback       = void (*)();
+        using JoiningCallback       = void (*)();
 
-            uint8_t dio0;
-            uint8_t dio1;
-        };
+        /**
+         * @brief Constructor for LoRaWANCommunication.
+         */
+        LoRaWANCommunication();
 
-
-        using JoinedCallback = void (*)();
-
-
-        using DownlinkCallback =
-            void (*)
-            (
-                uint8_t port,
-                const uint8_t* data,
-                uint8_t length
-            );
-
-
-        using PayloadBuilder =
-            uint8_t (*)
-            (
-                uint8_t* buffer,
-                uint8_t maxLength
-            );
-
-
-        LoRaWANCommunication(const RadioPins& pins, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16]);
-        LoRaWANCommunication() = default;
+        /**
+         * @brief Configure the LoRaWAN communication parameters before initialization.
+         * @param nss                 SPI Chip Select pin for the LoRa module.
+         * @param rst                 Reset pin for the LoRa module.
+         * @param dio0                DIO0 pin for the LoRa module.
+         * @param dio1                DIO1 pin for the LoRa module.
+         * @param devEui              Device EUI (8 bytes).
+         * @param appEui              Application EUI (8 bytes).
+         * @param appKey              Application Key (16 bytes).
+         * @param payloadBuilder      Function pointer to a payload builder function that fills the buffer with data to send.
+         * @param autoUplinkInterval  Interval in seconds for automatic uplink transmissions.
+         */
+        void configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder builder, uint32_t autoUplinkInterval);
+        
+        /**
+         * @brief Initialize the LoRaWAN communication module.
+         * @return true if initialization was successful, false otherwise.
+         */
         bool begin() override;
-        void loop();
+
+        /**
+         * @brief Check if the LoRaWAN module is present on the SPI bus.
+         * @return true if the module is detected, false otherwise.
+         */
         bool checkModulePresence();
+
+        /**
+         * @brief Main loop to handle LoRaWAN events and automatic uplink transmissions.
+         */
+        void loop();
+
+        /**
+         * @brief Send an uplink message over LoRaWAN.
+         * @param payload Pointer to the data buffer to send.
+         * @param length Length of the data to send in bytes.
+         * @param port LoRaWAN port number (default is 1).
+         * @param confirmed true for confirmed uplink, false for unconfirmed (default is false).
+         * @return true if the message was queued for transmission, false otherwise.
+         */
         bool sendUplink(const uint8_t* payload, uint8_t length, uint8_t port = 1, bool confirmed = false);
+
+        /**
+         * @brief Check if the device has successfully joined the LoRaWAN network.
+         * @return true if joined, false otherwise.
+         */
         bool isJoined() const;
+
+        /**
+         * @brief Check if there is a pending transmission.
+         * @return true if a transmission is pending, false otherwise.
+         */
         bool isTxPending() const;
-        void setAutoUplinkInterval(uint32_t seconds);
-        void setPayloadBuilder(PayloadBuilder builder);
-        void onJoined(JoinedCallback callback);
-        void onDownlink(DownlinkCallback callback);
-        bool send(uint8_t* data, size_t size) override;
+        
+        void onJoined       (JoinedCallback       cb) { joinedCb        = cb; } // Callback for when the device successfully joins the LoRaWAN network
+        void onDownlink     (DownlinkCallback     cb) { downlinkCb      = cb; } // Callback for when a downlink message is received
+        void onTxComplete   (TxCompleteCallback   cb) { txCompleteCb    = cb; } // Callback for when a transmission is complete (with or without downlink)
+        void onJoinFailed   (JoinFailedCallback   cb) { joinFailedCb    = cb; } // Callback for when the join process fails
+        void onRejoinFailed (RejoinFailedCallback cb) { rejoinFailedCb  = cb; } // Callback for when a rejoin attempt fails
+        void onLinkDead     (LinkDeadCallback     cb) { linkDeadCb      = cb; } // Callback for when the LoRaWAN link is considered dead (no downlink received for a while)
+        void onLinkAlive    (LinkAliveCallback    cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
+        void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
+        void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join process
 
     private:
-        RadioPins pins;
+        uint8_t nssPin;     // SPI Chip Select pin for the LoRa module
+        uint8_t rstPin;     // Reset pin for the LoRa module
+        uint8_t dio0Pin;    // DIO0 pin for the LoRa module
+        uint8_t dio1Pin;    // DIO1 pin for the LoRa module
 
-        uint8_t devEui[8];
-        uint8_t appEui[8];
-        uint8_t appKey[16];
+        uint8_t devEui[8];   // Device EUI
+        uint8_t appEui[8];   // Application EUI
+        uint8_t appKey[16];  // Application Key
 
-        bool joined = false;
+        bool joined = false;    // True if the device has successfully joined the LoRaWAN network
 
-        uint32_t autoUplinkInterval = 60;
-        PayloadBuilder payloadBuilder = nullptr;
+        uint32_t autoUplinkInterval = 60;        // Interval in seconds for automatic uplink transmissions
+        PayloadBuilder payloadBuilder = nullptr; // Function to build the payload for uplink messages   
 
 
-        JoinedCallback joinedCb = nullptr;
-        DownlinkCallback downlinkCb = nullptr;
+        // Callback function pointers for various LoRaWAN events
+        JoinedCallback       joinedCb        = nullptr; 
+        DownlinkCallback     downlinkCb      = nullptr;
+        TxCompleteCallback   txCompleteCb    = nullptr;
+        JoinFailedCallback   joinFailedCb    = nullptr;
+        RejoinFailedCallback rejoinFailedCb  = nullptr;
+        LinkDeadCallback     linkDeadCb      = nullptr;
+        RxStartCallback      rxStartCb       = nullptr;
+        JoiningCallback      joiningCb       = nullptr;
+        LinkAliveCallback    linkAliveCb     = nullptr;
 
-        osjob_t sendjob;
+        osjob_t sendjob;    // Job structure for scheduling automatic uplink transmissions
 
-        static constexpr uint8_t MAX_PAYLOAD_LEN = 51;
+        static constexpr uint8_t MAX_PAYLOAD_LEN = 51;  // Maximum payload length for LoRaWAN 
 
+        /**
+         * @brief Read a register from the LoRa module
+         * @param address The address of the register to read
+         * @return The value read from the register
+         */
         uint8_t readRegister(uint8_t address);
+
+        /**
+         * @brief Handle a LoRaWAN event
+         * @param event The event to handle
+         */
         void handleEvent(ev_t event);
+
+        /**
+         * @brief Handle automatic uplink transmissions
+         */
         void handleAutoSend();
-        static void onEventRelay(ev_t event);
+
+        /**
+         * @brief Relay function for scheduling automatic uplink transmissions
+         * @param job The job structure
+         */
         static void doSendRelay(osjob_t* job);
+
+        // Friend functions to allow LMIC library to access private members of this class
         friend void os_getDevEui(u1_t* buf);
         friend void os_getArtEui(u1_t* buf);
         friend void os_getDevKey(u1_t* buf);
         friend void onEvent(ev_t event);
 };
 
+// ============================================================
+// Implementation of LoRaWANCommunication methods
+// ============================================================
 
-inline LoRaWANCommunication lorawan;
+extern LoRaWANCommunication* lorawanPtr;    // Pointer to the LoRaWANCommunication instance for LMIC callbacks
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Credentials configuration
+// ─────────────────────────────────────────────────────────────────────────────
 extern "C"
 {
     void os_getDevEui(u1_t* buf)
     {
-        memcpy(buf,lorawan.devEui,8);
+        memcpy(buf, lorawanPtr->devEui, 8);
     }
 
 
     void os_getArtEui(u1_t* buf)
     {
-        memcpy(buf, lorawan.appEui, 8);
+        memcpy(buf, lorawanPtr->appEui, 8);
     }
 
 
     void os_getDevKey(u1_t* buf)
     {
-        memcpy(buf, lorawan.appKey, 16);
+        memcpy(buf, lorawanPtr->appKey, 16);
     }
 
 
     void onEvent(ev_t event)
     {
-        lorawan.onEventRelay(event);
+        lorawanPtr->handleEvent(event);
     }
 }
 
-// ============================================================
-// Constructeur
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// Constructor
+// ─────────────────────────────────────────────────────────────────────────────
 
-inline LoRaWANCommunication::LoRaWANCommunication(const RadioPins& pins, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16])
-    : pins(pins), Communication()
+inline LoRaWANCommunication::LoRaWANCommunication()
+    : Communication()
 {
-    memcpy(this->devEui, devEui, 8);
-    memcpy(this->appEui, appEui, 8);
-    memcpy(this->appKey, appKey, 16);
+
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+inline void LoRaWANCommunication::configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder payloadBuilder, uint32_t autoUplinkInterval)
+{
+    nssPin = nss;
+    rstPin = rst;
+    dio0Pin = dio0;
+    dio1Pin = dio1;
+
+    memcpy(this->devEui, devEui, sizeof(this->devEui));
+    memcpy(this->appEui, appEui, sizeof(this->appEui));
+    memcpy(this->appKey, appKey, sizeof(this->appKey));
+    this->payloadBuilder = payloadBuilder;
+    this->autoUplinkInterval = autoUplinkInterval;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Initialization
+// ─────────────────────────────────────────────────────────────────────────────
+
+inline bool LoRaWANCommunication::begin()
+{
+    pinMode(nssPin, OUTPUT);
+    digitalWrite(nssPin, HIGH);
+
+    if (!checkModulePresence())
+    {
+        return false;
+    }
+
+    lmic_pinmap pinmap =
+    {
+        .nss = nssPin,
+
+        .rxtx = LMIC_UNUSED_PIN,
+
+        .rst = rstPin,
+
+        .dio =
+        {
+            dio0Pin,
+            dio1Pin,
+            LMIC_UNUSED_PIN
+        }
+    };
+
+    os_init_ex(&pinmap);
+    LMIC_reset();
+    LMIC_setLinkCheckMode(0);
+    LMIC_setAdrMode(1);
+
+    LMIC_startJoining();
+
+    initialized = true;
+    return true;
+}
 
 inline uint8_t LoRaWANCommunication::readRegister(uint8_t address)
 {
-    digitalWrite(pins.nss, LOW);
+    digitalWrite(nssPin, LOW);
     SPI.transfer(address & 0x7F);
     uint8_t value = SPI.transfer(0x00);
-    digitalWrite(pins.nss, HIGH);
+    digitalWrite(nssPin, HIGH);
 
     return value;
 }
-
-
-// ============================================================
-// Vérification de présence du SX1276
-// ============================================================
 
 inline bool LoRaWANCommunication::checkModulePresence()
 {
@@ -173,53 +300,9 @@ inline bool LoRaWANCommunication::checkModulePresence()
     return false;
 }
 
-
-// ============================================================
-// begin()
-// ============================================================
-
-inline bool LoRaWANCommunication::begin()
-{
-    pinMode(pins.nss, OUTPUT);
-    digitalWrite(pins.nss, HIGH);
-
-    if (!checkModulePresence())
-    {
-        return false;
-    }
-
-
-    lmic_pinmap pinmap =
-    {
-        .nss = pins.nss,
-
-        .rxtx = LMIC_UNUSED_PIN,
-
-        .rst = pins.rst,
-
-        .dio =
-        {
-            pins.dio0,
-            pins.dio1,
-            LMIC_UNUSED_PIN
-        }
-    };
-
-    os_init_ex(&pinmap);
-    LMIC_reset();
-    LMIC_setLinkCheckMode(0);
-    LMIC_setAdrMode(1);
-
-    LMIC_startJoining();
-
-    initialized = true;
-    return true;
-}
-
-
-// ============================================================
-// loop()
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// Main loop
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void LoRaWANCommunication::loop()
 {
@@ -227,9 +310,9 @@ inline void LoRaWANCommunication::loop()
 }
 
 
-// ============================================================
-// Envoi manuel
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// Data Transmission
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline bool LoRaWANCommunication::sendUplink(
     const uint8_t* payload,
@@ -247,73 +330,6 @@ inline bool LoRaWANCommunication::sendUplink(
 
     return true;
 }
-
-
-// ============================================================
-// Vérification Join
-// ============================================================
-
-inline bool LoRaWANCommunication::isJoined() const
-{
-    return joined;
-}
-
-
-// ============================================================
-// Vérification transmission en cours
-// ============================================================
-
-inline bool LoRaWANCommunication::isTxPending() const
-{
-    return (LMIC.opmode & OP_TXRXPEND) != 0;
-}
-
-
-// ============================================================
-// Configuration intervalle uplink automatique
-// ============================================================
-
-inline void LoRaWANCommunication::setAutoUplinkInterval(uint32_t seconds)
-{
-    autoUplinkInterval = seconds;
-}
-
-
-// ============================================================
-// Configuration PayloadBuilder
-// ============================================================
-
-inline void LoRaWANCommunication::setPayloadBuilder(PayloadBuilder builder)
-{
-    payloadBuilder = builder;
-}
-
-
-// ============================================================
-// Callback Join
-// ============================================================
-
-inline void LoRaWANCommunication::onJoined(JoinedCallback callback)
-{
-    joinedCb = callback;
-}
-
-
-// ============================================================
-// Callback Downlink
-// ============================================================
-
-inline void LoRaWANCommunication::onDownlink(
-    DownlinkCallback callback
-)
-{
-    downlinkCb = callback;
-}
-
-
-// ============================================================
-// Envoi automatique
-// ============================================================
 
 inline void LoRaWANCommunication::handleAutoSend()
 {
@@ -333,114 +349,85 @@ inline void LoRaWANCommunication::handleAutoSend()
     LMIC_setTxData2(1, buffer, length, 0);
 }
 
-
-// ============================================================
-// Relais événement LMIC
-// ============================================================
-
-inline void LoRaWANCommunication::onEventRelay(ev_t event)
-{
-    lorawan.handleEvent(event);
-}
-
-// ============================================================
-// Relais envoi automatique
-// ============================================================
-
 inline void LoRaWANCommunication::doSendRelay(osjob_t* job)
 {
-    lorawan.handleAutoSend();
+    lorawanPtr->handleAutoSend();
 }
 
-
-// ============================================================
-// Gestion événements LMIC
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// Event Handling
+// ─────────────────────────────────────────────────────────────────────────────
 
 inline void LoRaWANCommunication::handleEvent(ev_t event)
 {
     switch (event)
     {
-        // ----------------------------------------------------
-        // Join en cours
-        // ----------------------------------------------------
         case EV_JOINING:
+            if (joiningCb) joiningCb();
             break;
 
-        // ----------------------------------------------------
-        // Join réussi
-        // ----------------------------------------------------
         case EV_JOINED:
             joined = true;
-
             LMIC_setLinkCheckMode(0);
             LMIC_setAdrMode(1);
-
-            if (joinedCb)
-            {
-                joinedCb();
-            }
-
+            if (joinedCb) joinedCb();
             handleAutoSend();
             break;
 
+        case EV_JOIN_FAILED:
+            joined = false;
+            if (joinFailedCb) joinFailedCb();
+            break;
 
-        // ----------------------------------------------------
-        // Transmission terminée
-        // ----------------------------------------------------
+        case EV_REJOIN_FAILED:
+            joined = false;
+            if (rejoinFailedCb) rejoinFailedCb();
+            break;
+
         case EV_TXCOMPLETE:
             if (LMIC.dataLen && downlinkCb)
             {
-                uint8_t port =LMIC.frame[LMIC.dataBeg - 1];
+                uint8_t port = LMIC.frame[LMIC.dataBeg - 1];
                 downlinkCb(port, LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
             }
-
+            if (txCompleteCb) txCompleteCb(LMIC.dataLen > 0);
             if (payloadBuilder)
             {
                 os_setTimedCallback(
                     &sendjob,
-                    os_getTime() +
-                        sec2osticks(
-                            autoUplinkInterval
-                        ),
+                    os_getTime() + sec2osticks(autoUplinkInterval),
                     doSendRelay
                 );
             }
-
-
             break;
 
-
-        // ----------------------------------------------------
-        // Join échoué
-        // ----------------------------------------------------
-        case EV_JOIN_FAILED:
-            joined =false;
+        case EV_LINK_DEAD:
+            if (linkDeadCb) linkDeadCb();
             break;
 
-
-        // ----------------------------------------------------
-        // Rejoin échoué
-        // ----------------------------------------------------
-        case EV_REJOIN_FAILED:
-            joined = false;
+        case EV_LINK_ALIVE:
+            if (linkAliveCb) linkAliveCb();
             break;
 
-        // ----------------------------------------------------
-        // Autres événements
-        // ----------------------------------------------------
+        case EV_RXSTART:
+            if (rxStartCb) rxStartCb();
+            break;
 
         default:
             break;
     }
 }
 
-inline bool LoRaWANCommunication::send(uint8_t* data, size_t size)
-{
-    if (size > MAX_PAYLOAD_LEN)
-    {
-        return false;
-    }
+// ─────────────────────────────────────────────────────────────────────────────
+// Status Checks
+// ─────────────────────────────────────────────────────────────────────────────
 
-    return sendUplink(data, static_cast<uint8_t>(size));
+inline bool LoRaWANCommunication::isJoined() const
+{
+    return joined;
+}
+
+inline bool LoRaWANCommunication::isTxPending() const
+{
+    return (LMIC.opmode & OP_TXRXPEND) != 0;
 }
