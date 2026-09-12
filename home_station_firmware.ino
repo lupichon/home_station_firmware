@@ -675,7 +675,7 @@ void setWifiCallbacks()
             String s = "\"";
             s += key;
             s += "\":";
-            s += (val != (uint16_t)NAN) ? String(val) : "null";
+            s += val;
             return s;
         };
 
@@ -691,7 +691,7 @@ void setWifiCallbacks()
         json += floatField("luminosity",  measurement.luminosity)  + ",";
         json += floatField("pressure",    measurement.pressure)    + ",";
         json += intField("co2",           measurement.co2)         + ",";
-        json += intField("gasRaw",        measurement.gasRaw)      + ",";
+        json += intField("gasState",      static_cast<uint16_t>(gasStateFromRaw(measurement.gasRaw))) + ",";
         json += intField("vocIndex",      measurement.vocIndex)    + ",";
         json += intField("noxIndex",      measurement.noxIndex)    + ",";
         json += boolField("motion",       measurement.motion) + ",";
