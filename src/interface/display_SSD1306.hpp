@@ -13,7 +13,6 @@
 #include <Adafruit_SSD1306.h>
 
 #include "../core/measurement.hpp"
-#include "../core/gas_state.hpp"
 #include "../core/clock.hpp"
 
 // ============================================================
@@ -485,12 +484,9 @@ inline void DisplaySSD1306::displayCO2(uint16_t value)
     displayValue("CO2", "ppm", 0, value);
 }
 
-inline void DisplaySSD1306::displayGasLevel(uint16_t raw)
+inline void DisplaySSD1306::displayGasLevel(uint16_t value)
 {
-    GasState state = gasStateFromRaw(raw);
-    const char* stateStr = gasStateToString(state);
-
-    displayValue("Gas Level", stateStr, 0, raw);
+    displayValue("Gas raw", "", 0, value);
 }
 
 inline void DisplaySSD1306::displayLuminosity(float value)

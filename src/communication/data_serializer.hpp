@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "../core/measurement.hpp"
-#include "../core/gas_state.hpp"
 
 // ============================================================
 // Buffer layout constants
