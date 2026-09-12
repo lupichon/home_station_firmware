@@ -685,18 +685,18 @@ void setWifiCallbacks()
         };
 
         String json = "{";
-        json += "\"timestamp\":" + String(measurement.timestamp) + ",";
+        json += "\"timestamp\":" + String(measurement.timestamp)   + ",";
         json += floatField("temperature", measurement.temperature) + ",";
         json += floatField("humidity",    measurement.humidity)    + ",";
         json += floatField("luminosity",  measurement.luminosity)  + ",";
         json += floatField("pressure",    measurement.pressure)    + ",";
         json += intField("co2",           measurement.co2)         + ",";
-        json += intField("gasState",      static_cast<uint16_t>(gasStateFromRaw(measurement.gasRaw))) + ",";
+        json += intField("gasRaw",        measurement.gasRaw)      + ",";
         json += intField("vocIndex",      measurement.vocIndex)    + ",";
         json += intField("noxIndex",      measurement.noxIndex)    + ",";
-        json += boolField("motion",       measurement.motion) + ",";
-        json += boolField("sound",        measurement.sound) + ",";
-        json += boolField("obstacle",     measurement.obstacle) + ",";
+        json += boolField("motion",       measurement.motion)      + ",";
+        json += boolField("sound",        measurement.sound)       + ",";
+        json += boolField("obstacle",     measurement.obstacle)    + ",";
         json += boolField("vibration",    measurement.vibration);
         json += "}";
 

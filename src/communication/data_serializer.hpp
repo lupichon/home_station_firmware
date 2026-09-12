@@ -18,10 +18,10 @@
 // ============================================================
 
 constexpr size_t NB_FLOATS    = 4; // Number of float fields    (temperature, humidity, luminosity, pressure)
-constexpr size_t NB_UINT16    = 3; // Number of uint16_t fields (co2, vocIndex, noxIndex)
-constexpr size_t NB_FLAG_BYTE = 1; // Number of flag bytes      (motion, sound, obstacle, vibration, gas state)
+constexpr size_t NB_UINT16    = 4; // Number of uint16_t fields (co2, vocIndex, noxIndex, gasRaw)
+constexpr size_t NB_FLAG_BYTE = 1; // Number of flag bytes      (motion, sound, obstacle, vibration)
 
-constexpr size_t BUFFER_SIZE = (sizeof(float)    * NB_FLOATS)
+constexpr size_t BUFFER_SIZE = (sizeof(float)     * NB_FLOATS)
                              + (sizeof(uint16_t)  * NB_UINT16)
                              + (sizeof(uint8_t)   * NB_FLAG_BYTE);
 
@@ -52,6 +52,7 @@ inline size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t 
     memcpy(buffer + offset, &measurement.co2,      sizeof(uint16_t)); offset += sizeof(uint16_t);
     memcpy(buffer + offset, &measurement.vocIndex, sizeof(uint16_t)); offset += sizeof(uint16_t);
     memcpy(buffer + offset, &measurement.noxIndex, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(buffer + offset, &measurement.gasRaw,   sizeof(uint16_t)); offset += sizeof(uint16_t);
 
     // Flag byte: bits 0-3 = binary sensors, bits 4-5 = gas state
     uint8_t flags = 0;
@@ -59,7 +60,6 @@ inline size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t 
     flags |= (measurement.sound     ? 1 : 0) << 1;
     flags |= (measurement.obstacle  ? 1 : 0) << 2;
     flags |= (measurement.vibration ? 1 : 0) << 3;
-    flags |= (static_cast<uint8_t>(gasStateFromRaw(measurement.gasRaw)) & 0x03) << 4;
 
     buffer[offset] = flags; offset += sizeof(uint8_t);
 
