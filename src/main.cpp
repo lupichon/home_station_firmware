@@ -5,40 +5,63 @@
  * @date    2026-07-16
  */
 
+void initSerial();
+void initInterface();
+void initStorage();
+void initClock();
+void initAlarmManager();
+void initCommunication();
+void initSensors();
+void handleLoRaWAN();
+void handleWifi();
+void handleSoundSensor();
+void handleAlarmManager();
+void handleScreen();
+void handleBuzzer();
+void handleButton();
+void handleLED();
+void handleMeasurements();
+void handleBluetooth();
+void setAlarmManagerCallbacks();
+void setWifiCallbacks();
+void setBluetoothCallbacks();
+void setLoRaWANCallbacks();
+void printDebugInfo();
+
 #include <Arduino.h>
 
 // ==================== Core ====================
-#include "src/core/measurement.hpp"
-#include "src/core/status.hpp"
-#include "src/core/pins.hpp"
-#include "src/core/storage.hpp"
-#include "src/core/configuration_manager.hpp"
-#include "src/core/alarm_manager.hpp"
-#include "src/core/clock.hpp"
-#include "src/core/device_config.hpp"
+#include "core/measurement.hpp"
+#include "core/status.hpp"
+#include "core/pins.hpp"
+#include "core/storage.hpp"
+#include "core/configuration_manager.hpp"
+#include "core/alarm_manager.hpp"
+#include "core/clock.hpp"
+#include "core/device_config.hpp"
 
 // ==================== Sensors ====================
-#include "src/sensors/BH1750/driver_BH1750.hpp"
-#include "src/sensors/HC-SR501/driver_HC-SR501.hpp"
-#include "src/sensors/SCD41/driver_SCD41.hpp"
-#include "src/sensors/MAX9814/driver_MAX9814.hpp"
-#include "src/sensors/FC-51/driver_FC-51.hpp"
-#include "src/sensors/SW-420/driver_SW-420.hpp"
-#include "src/sensors/MQ-2/driver_MQ-2.hpp"
-#include "src/sensors/BMP280/driver_BMP280.hpp"
-#include "src/sensors/SGP41/driver_SGP41.hpp"
+#include "sensors/BH1750/driver_BH1750.hpp"
+#include "sensors/HC-SR501/driver_HC-SR501.hpp"
+#include "sensors/SCD41/driver_SCD41.hpp"
+#include "sensors/MAX9814/driver_MAX9814.hpp"
+#include "sensors/FC-51/driver_FC-51.hpp"
+#include "sensors/SW-420/driver_SW-420.hpp"
+#include "sensors/MQ-2/driver_MQ-2.hpp"
+#include "sensors/BMP280/driver_BMP280.hpp"
+#include "sensors/SGP41/driver_SGP41.hpp"
 
 // ==================== Communication ====================
-#include "src/communication/data_serializer.hpp"
-#include "src/communication/bluetooth/bluetooth.hpp"
-#include "src/communication/wifi/wifi.hpp"
-#include "src/communication/LoRaWAN/lorawan.hpp"
+#include "communication/data_serializer.hpp"
+#include "communication/bluetooth/bluetooth.hpp"
+#include "communication/wifi/wifi.hpp"
+#include "communication/LoRaWAN/lorawan.hpp"
 
 // ==================== Interface ====================
-#include "src/interface/status_led.hpp"
-#include "src/interface/display_SSD1306.hpp"
-#include "src/interface/button.hpp"
-#include "src/interface/buzzer.hpp"
+#include "interface/status_led.hpp"
+#include "interface/display_SSD1306.hpp"
+#include "interface/button.hpp"
+#include "interface/buzzer.hpp"
 
 // ==================== Debug ====================
 #define DEBUG_ENABLE 1
