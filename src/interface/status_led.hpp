@@ -105,7 +105,8 @@ class StatusLED
             ALARM_TRIGGERED      = 1 << 2, //An alarm has been triggered.
             ALARM_ARMED          = 1 << 3, //The alarm system is armed.
             BUTTON_HELD          = 1 << 4, //A button is currently held.
-            TIME_SYNCED          = 1 << 5  //System time has been synchronized.
+            TIME_SYNCED          = 1 << 5, //System time has been synchronized.
+            LORAWAN_TX           = 1 << 6  //A LoRaWAN transmission has occurred recently.
         };
 
         /**
@@ -446,6 +447,9 @@ inline StatusLED::BlinkProfile StatusLED::colorFor(Indicator i)
 
         case Indicator::TIME_SYNCED:
             return {LedColor::BROWN, Delay::MS_0, Delay::MS_0, false};
+        
+        case Indicator::LORAWAN_TX:
+            return {LedColor::AMBER, Delay::MS_0, Delay::MS_0, false};
 
         default:
             return {LedColor::OFF, Delay::MS_0, Delay::MS_0, false};

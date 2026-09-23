@@ -5,6 +5,10 @@
  * @date    2026-07-29
  */
 
+// !!!!!!!!!!!!!!!!!! WARNING !!!!!!!!!!!!!!!!!
+// To configure the correct frequency for your region, you need to modify the project_config/lmic_project_config.h file.
+// (./Arduino/libraries/MCCI_LoRaWAN_LMIC_library/project_config/lmic_project_config.h)
+
 #pragma once
 
 #include <Arduino.h>
@@ -13,7 +17,6 @@
 #include <hal/hal.h>
 #include "../communication.hpp"
 
-//TODO : A TESTER
 
 extern "C"
 {
@@ -41,6 +44,7 @@ class LoRaWANCommunication : public Communication
         using RxStartCallback       = void (*)();
         using JoiningCallback       = void (*)();
         using BeforeUplinkCallback  = void (*)();
+        using TxStartCallback       = void (*)();
 
         /**
          * @brief Constructor for LoRaWANCommunication.
@@ -107,7 +111,20 @@ class LoRaWANCommunication : public Communication
          * @return true if a transmission is pending, false otherwise.
          */
         bool isTxPending() const;
-        
+
+        /**
+         * @brief Get the timestamp of the last LoRaWAN transmission in milliseconds.
+         * @return Timestamp of the last LoRaWAN transmission in milliseconds.
+         */
+        unsigned long getLastLoRaTwMs() const;
+
+        /**
+         * @brief Set the timestamp of the last LoRaWAN transmission in milliseconds.
+         * @param timestamp Timestamp of the last LoRaWAN transmission in milliseconds.
+         */
+        void setLastLoRaTwMs(unsigned long timestamp);
+
+        // Callback setters for various LoRaWAN events
         void onJoined       (JoinedCallback       cb) { joinedCb        = cb; } // Callback for when the device successfully joins the LoRaWAN network
         void onDownlink     (DownlinkCallback     cb) { downlinkCb      = cb; } // Callback for when a downlink message is received
         void onTxComplete   (TxCompleteCallback   cb) { txCompleteCb    = cb; } // Callback for when a transmission is complete (with or without downlink)
@@ -117,7 +134,8 @@ class LoRaWANCommunication : public Communication
         void onLinkAlive    (LinkAliveCallback    cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
         void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
         void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join process
-        void onBeforeUplink (BeforeUplinkCallback cb) { beforeUplinkCb = cb;  } // Callback for before an automatic uplink transmission is sent
+        void onBeforeUplink (BeforeUplinkCallback cb) { beforeUplinkCb  = cb; } // Callback for before an automatic uplink transmission is sent
+        void onTxStart      (TxStartCallback      cb) { txStartCb       = cb; } // Callback for when a transmission starts
 
     private:
         uint8_t nssPin;     // SPI Chip Select pin for the LoRa module
@@ -134,6 +152,7 @@ class LoRaWANCommunication : public Communication
         uint32_t autoUplinkInterval = 60;        // Interval in seconds for automatic uplink transmissions
         PayloadBuilder payloadBuilder = nullptr; // Function to build the payload for uplink messages   
 
+        unsigned long lastLoRaTwMs = 0;  // Timestamp of the last LoRaWAN transmission in milliseconds
 
         // Callback function pointers for various LoRaWAN events
         JoinedCallback       joinedCb        = nullptr; 
@@ -145,7 +164,8 @@ class LoRaWANCommunication : public Communication
         RxStartCallback      rxStartCb       = nullptr;
         JoiningCallback      joiningCb       = nullptr;
         LinkAliveCallback    linkAliveCb     = nullptr;
-        BeforeUplinkCallback beforeUplinkCb   = nullptr;
+        BeforeUplinkCallback beforeUplinkCb  = nullptr;
+        TxStartCallback       txStartCb      = nullptr;
 
         osjob_t sendjob;    // Job structure for scheduling automatic uplink transmissions
 
@@ -195,13 +215,15 @@ extern "C"
 {
     void os_getDevEui(u1_t* buf)
     {
-        memcpy(buf, lorawanPtr->devEui, 8);
+        for (int i = 0; i < 8; i++)
+            buf[i] = lorawanPtr->devEui[7 - i];
     }
 
 
     void os_getArtEui(u1_t* buf)
     {
-        memcpy(buf, lorawanPtr->appEui, 8);
+        for (int i = 0; i < 8; i++)
+            buf[i] = lorawanPtr->appEui[7 - i];
     }
 
 
@@ -254,12 +276,18 @@ inline bool LoRaWANCommunication::begin()
     pinMode(nssPin, OUTPUT);
     digitalWrite(nssPin, HIGH);
 
+    pinMode(rstPin, OUTPUT);
+    digitalWrite(rstPin, LOW);
+    delay(10);
+    digitalWrite(rstPin, HIGH);
+    delay(10);
+
     if (!checkModulePresence())
     {
         return false;
     }
 
-    lmic_pinmap pinmap =
+    static const lmic_pinmap pinmap =
     {
         .nss = nssPin,
 
@@ -279,6 +307,7 @@ inline bool LoRaWANCommunication::begin()
     LMIC_reset();
     LMIC_setLinkCheckMode(0);
     LMIC_setAdrMode(1);
+    LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
     LMIC_startJoining();
 
@@ -288,10 +317,12 @@ inline bool LoRaWANCommunication::begin()
 
 inline uint8_t LoRaWANCommunication::readRegister(uint8_t address)
 {
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
     digitalWrite(nssPin, LOW);
     SPI.transfer(address & 0x7F);
     uint8_t value = SPI.transfer(0x00);
     digitalWrite(nssPin, HIGH);
+    SPI.endTransaction();
 
     return value;
 }
@@ -410,6 +441,10 @@ inline void LoRaWANCommunication::handleEvent(ev_t event)
             if (rejoinFailedCb) rejoinFailedCb();
             break;
 
+        case EV_TXSTART:
+            if (txStartCb) txStartCb();
+            break;
+
         case EV_TXCOMPLETE:
             if (LMIC.dataLen && downlinkCb)
             {
@@ -457,3 +492,18 @@ inline bool LoRaWANCommunication::isTxPending() const
 {
     return (LMIC.opmode & OP_TXRXPEND) != 0;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Getters / Setters
+// ─────────────────────────────────────────────────────────────────────────────
+
+inline unsigned long LoRaWANCommunication::getLastLoRaTwMs() const
+{
+    return lastLoRaTwMs;
+}
+
+inline void LoRaWANCommunication::setLastLoRaTwMs(unsigned long timestamp)
+{
+    lastLoRaTwMs = timestamp;
+}
+// ─────────────────────────────────────────────────────────────────────────────

@@ -108,6 +108,8 @@ unsigned long last10Ms   = 0;
 unsigned long last100Ms  = 0;
 unsigned long last1000Ms = 0;
 
+constexpr unsigned long lorawanAutoUplinkInterval_S = 300;
+
 // ==================== Counts ====================
 int sensorCount = Sensor::getSensorCount();
 int commCount   = Communication::getCommunicationCount();
@@ -172,8 +174,6 @@ void loop()
             handleMeasurements();
         }
         handleBluetooth();
-        handleLorawanStatus();
-        handleWifiStatus();
     }
 }
 
@@ -265,7 +265,7 @@ void initCommunication()
                           {
                               return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
                           },
-                          60);
+                          lorawanAutoUplinkInterval_S);
         setLoRaWANCallbacks(); 
         lorawan.begin();
     }
@@ -352,6 +352,12 @@ void handleLED()
 {
     statusLED.update();
 
+    status.lorawanOK = !isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT)
+                       || (lorawan.isInitialized() && lorawan.isJoined());
+
+    status.wifiOK = !isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT)
+                    || wifi.isInitialized();
+
     if (!status.sensorOK && !status.lorawanOK)
     {
         statusLED.setState(StatusLED::State::ERROR);
@@ -375,6 +381,7 @@ void handleLED()
     statusLED.setIndicator(StatusLED::Indicator::ALARM_ARMED, alarmManager.isArmed());
     statusLED.setIndicator(StatusLED::Indicator::BUTTON_HELD, button.isHeld());
     statusLED.setIndicator(StatusLED::Indicator::TIME_SYNCED, systemClock.isSynchronized() && systemClock.isSynchronizedSince() <= 30);
+    statusLED.setIndicator(StatusLED::Indicator::LORAWAN_TX, lorawan.getLastLoRaTwMs() > 0 && (millis() - lorawan.getLastLoRaTwMs() < 30000));
 }
 
 // Handle the button press and hold events, including reboot on long press
@@ -467,7 +474,7 @@ void handleMeasurements()
             bool successSensor = sensor.read(measurement);
             success &= successSensor;
 
-            #if DEBUG_ENABLE
+            #if DEBUG_ENABLE 
             Serial.println(sensor.displayValue(measurement));
             #endif
         }
@@ -515,28 +522,6 @@ void handleBluetooth()
         Serial.println("Failed to send data over Bluetooth.");
     }
     #endif
-}
-
-void handleLorawanStatus()
-{
-    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
-    {
-        status.lorawanOK = true; 
-        return;
-    }
-
-    status.lorawanOK = lorawan.isInitialized() && lorawan.isJoined();
-}
-
-void handleWifiStatus()
-{
-    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) || wifi.isSleeping())
-    {
-        status.wifiOK = true; 
-        return;
-    }
-
-    status.wifiOK = wifi.isInitialized();
 }
 
 // =================== Callback Setup Functions ====================
@@ -741,49 +726,72 @@ void setLoRaWANCallbacks()
         handleMeasurements();
     });
 
-    #if DEBUG_ENABLE
     lorawan.onJoining([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : joining...");
+        #endif
     });
 
     lorawan.onJoined([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : joined successfully!");
+        #endif
     });
 
     lorawan.onJoinFailed([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : join failed.");
+        #endif
     });
 
     lorawan.onRejoinFailed([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : rejoin failed.");
+        #endif
+    });
+
+    lorawan.onTxStart([]()
+    {
+        #if DEBUG_ENABLE
+        Serial.println("LoRaWAN : transmission started.");
+        #endif
     });
 
     lorawan.onTxComplete([](bool hasDownlink)
     {
+        lorawan.setLastLoRaTwMs(millis());
+
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : transmission complete.");
         if (hasDownlink)
             Serial.println("LoRaWAN : downlink received.");
+        #endif
     });
 
     lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
     {
+        #if DEBUG_ENABLE
         Serial.printf("LoRaWAN : downlink on port %d (%d bytes)\n", port, length);
+        #endif
     });
 
     lorawan.onLinkDead([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : link dead.");
+        #endif
     });
 
     lorawan.onLinkAlive([]()
     {
+        #if DEBUG_ENABLE
         Serial.println("LoRaWAN : link alive.");
+        #endif
     });
-    #endif
 }
 
 // =================== Debug Functions ====================
@@ -834,5 +842,14 @@ void printDebugInfo()
     Serial.print("utcOffset: ");          Serial.println(deviceConfig.utcOffset);
     Serial.print("enabledSensorsMask: "); Serial.println(deviceConfig.enabledSensorsMask, BIN);
     Serial.print("enabledCommsMask: ");   Serial.println(deviceConfig.enabledCommsMask, BIN);
+
+    Serial.println("--- LoRaWAN Region ---");  
+    #if defined(CFG_eu868)
+    Serial.println("Region: EU868");
+    #elif defined(CFG_us915)
+        Serial.println("Region: US915");
+    #else
+        Serial.println("Region: unknown");
+    #endif
     Serial.println("========================================");
 }

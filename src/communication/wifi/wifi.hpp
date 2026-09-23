@@ -441,7 +441,7 @@ inline void WiFiCommunication::handleGetMeasurement()
 inline bool WiFiCommunication::hasConnectedClient() const 
 { 
     // Check if the WiFi communication is initialized and if there is at least one connected client to the WiFi Access Point
-    if (!initialized)
+    if (!initialized || sleep)
     {
         return false;
     }
@@ -460,7 +460,6 @@ inline void WiFiCommunication::stop()
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_OFF);
     server.stop();
-    initialized = false;
     sleep = true;
     lastClientSeenMillis = 0;
 }
