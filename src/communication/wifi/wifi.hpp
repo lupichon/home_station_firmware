@@ -311,7 +311,7 @@ inline void WiFiCommunication::handlePostConfig()
     String body = server.arg("plain");
 
     // Parse the JSON body using ArduinoJson
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     if (deserializeJson(doc, body))
     {
         server.send(400, "application/json", "{\"ok\":false,\"error\":\"invalid JSON\"}");

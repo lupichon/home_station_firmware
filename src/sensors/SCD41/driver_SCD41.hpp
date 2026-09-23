@@ -93,7 +93,7 @@ inline SCD41Sensor::SCD41Sensor()
     : Sensor("SCD41"),
       lastTemperature(NAN),
       lastHumidity(NAN),
-      lastCO2(NAN),
+      lastCO2(0),
       lastSuccessfulReadTime(millis())
 {
 }

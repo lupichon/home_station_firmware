@@ -27,10 +27,10 @@ struct Measurement
     float humidity     = NAN;       // Relative humidity reading (%)
     float luminosity   = NAN;       // Luminosity reading (lux)
     float pressure     = NAN;       // Atmospheric pressure reading (hPa)
-    uint16_t co2       = NAN;       // CO2 concentration reading (ppm)
-    uint16_t gasRaw    = NAN;       // Raw gas sensor reading
-    uint16_t vocIndex  = NAN;       // VOC (volatile organic compounds) index
-    uint16_t noxIndex  = NAN;       // NOx (nitrogen oxides) index
+    uint16_t co2       = 0;       // CO2 concentration reading (ppm)
+    uint16_t gasRaw    = 0;       // Raw gas sensor reading
+    uint16_t vocIndex  = 0;       // VOC (volatile organic compounds) index
+    uint16_t noxIndex  = 0;       // NOx (nitrogen oxides) index
 
     bool motion        = false;     // Whether motion was detected
     bool sound         = false;     // Whether sound was detected
@@ -67,12 +67,12 @@ inline void clearMeasurement(Measurement& measurement)
     measurement.timestamp   = 0;
     measurement.temperature = NAN;
     measurement.humidity    = NAN;
-    measurement.co2         = NAN;
+    measurement.co2         = 0;
     measurement.luminosity  = NAN;
     measurement.pressure    = NAN;
-    measurement.gasRaw      = NAN;
-    measurement.vocIndex    = NAN;
-    measurement.noxIndex    = NAN;
+    measurement.gasRaw      = 0;
+    measurement.vocIndex    = 0;
+    measurement.noxIndex    = 0;
     measurement.motion      = false;
     measurement.sound       = false;
     measurement.obstacle    = false;
