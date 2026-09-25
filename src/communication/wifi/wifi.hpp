@@ -11,11 +11,13 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <Update.h>
 
 #include "../../core/device_config.hpp"
 #include "../../core/configuration_manager.hpp"
 #include "../communication.hpp"
 #include "wifi_config_page.hpp"
+#include "wifi_update_page.hpp"
 
 // ============================================================
 // WiFiCommunication class definition
@@ -47,6 +49,9 @@ class WiFiCommunication : public Communication
         void handleNotFound();
         void handleGetSensors();
         void handleGetMeasurement();
+        void handleUpdatePage();
+        void handleUpdatePost();
+        void handleUpdateUpload();
 
     // ── Public interface ──────────────────────────────────────────────────
     public:
@@ -174,6 +179,8 @@ inline bool WiFiCommunication::begin()
     server.on("/api/config",        HTTP_POST, [this]() { handlePostConfig();});
     server.on("/api/sensors",       HTTP_GET,  [this]() { handleGetSensors(); });
     server.on("/api/measurement",   HTTP_GET,  [this]() { handleGetMeasurement(); });
+    server.on("/update",            HTTP_GET,  [this]() { handleUpdatePage(); });
+    server.on("/update",            HTTP_POST, [this]() { handleUpdatePost(); });
     server.onNotFound(                         [this]() { handleNotFound(); });
 
     // Start the HTTP server
@@ -448,6 +455,51 @@ inline void WiFiCommunication::handleGetMeasurement()
         return;
     }
     server.send(200, "application/json", measurementProvider());
+}
+
+inline void WiFiCommunication::handleUpdatePage()
+{
+    server.send(200, "text/html", WIFI_UPDATE_PAGE);
+}
+
+inline void WiFiCommunication::handleUpdatePost()
+{
+    bool success = !Update.hasError();
+    server.send(success ? 200 : 500, "text/plain", success ? "OK" : "Update failed");
+    delay(500);
+    ESP.restart();
+}
+
+inline void WiFiCommunication::handleUpdateUpload()
+{
+    HTTPUpload& upload = server.upload();
+
+    if (upload.status == UPLOAD_FILE_START)
+    {
+        Serial.printf("OTA: %s\n", upload.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN))
+        {
+            Serial.println("OTA: begin failed");
+        }
+    }
+    else if (upload.status == UPLOAD_FILE_WRITE)
+    {
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+        {
+            Serial.println("OTA: write failed");
+        }
+    }
+    else if (upload.status == UPLOAD_FILE_END)
+    {
+        if (Update.end(true))
+        {
+            Serial.printf("OTA: success (%u bytes)\n", upload.totalSize);
+        }
+        else
+        {
+            Serial.println("OTA: end failed");
+        }
+    }
 }
 
 inline bool WiFiCommunication::hasConnectedClient() const 

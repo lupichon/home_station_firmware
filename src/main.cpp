@@ -5,8 +5,11 @@
  * @date    2026-07-16
  */
 
-//TODO: Tester l'encryption AES-128 (format des données envoyées, réception...)
-            // Changer la clée via l'interface web aussi
+/*TODO: *** Tester l'encryption AES-128 (format des données envoyées, réception...)
+            Changer la clée via l'interface web aussi
+
+        *** Tester la mise à jour du firmware via l'interface web
+*/        
 
 #include <Arduino.h>
 
