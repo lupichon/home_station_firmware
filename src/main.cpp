@@ -9,9 +9,13 @@
             Changer la clée via l'interface web aussi
 
         *** Tester la mise à jour du firmware via l'interface web
+
+        *** Tester le redémarrage automatique de l'esp (avec un delay(11000))
+            pour voir si le watchdog fonctionne correctement. 
 */        
 
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 
 // ==================== Core ====================
 #include "core/measurement.hpp"
@@ -489,6 +493,13 @@ void initSensors()
     }
 }
 
+// Initialize the watchdog timer to automatically reset the ESP if it becomes unresponsive.
+void initWatchdog()
+{
+    constexpr int WATCHDOG_TIMEOUT_S = 10; 
+    esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);
+    esp_task_wdt_add(NULL); 
+}
 // =================== Handler Functions ====================
 
 // Handle the alarm manager update
@@ -712,6 +723,11 @@ void handleBluetooth()
     #endif
 }
 
+void handleWatchdog()
+{
+    esp_task_wdt_reset();
+}
+
 #if DEBUG_ENABLE
 // =================== Debug Functions ====================
 void printDebugInfo()
@@ -777,6 +793,7 @@ void printDebugInfo()
 // ==================== Setup and Loop ====================
 void setup()
 {
+    initWatchdog();
     initSerial();
     initInterface();
     initStorage();
@@ -798,6 +815,7 @@ void loop()
     unsigned long now = millis();
 
     // Task executed every iteration
+    handleWatchdog();
     handleLoRaWAN();
     handleWifi();
 
