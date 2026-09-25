@@ -145,7 +145,7 @@ void setAlarmManagerCallbacks()
         deviceConfig.alarmArmed       = armed;
         deviceConfig.alarmTargetEpoch = targetEpoch;
         
-        #ifdef DEBUG_ENABLE
+        #if DEBUG_ENABLE
         Serial.println("Alarm changed: armed=" + String(armed) + ", targetEpoch=" + String(targetEpoch));
         #endif
     });
@@ -253,7 +253,7 @@ void setWifiCallbacks()
     
         storage.end();
 
-        #ifdef DEBUG_ENABLE
+        #if DEBUG_ENABLE
         Serial.println("Device configuration updated.");
         #endif
     });
@@ -299,7 +299,7 @@ void setWifiCallbacks()
         json += boolField("vibration",    measurement.vibration);
         json += "}";
 
-        #ifdef DEBUG_ENABLE
+        #if DEBUG_ENABLE
         Serial.println("Value sent over WiFi : " + json);
         #endif
 
@@ -314,7 +314,7 @@ void setBluetoothCallbacks()
     {
         systemClock.sync(epoch);
 
-        #ifdef DEBUG_ENABLE
+        #if DEBUG_ENABLE
         Serial.println("Time synchronized: epoch=" + String(epoch));
         #endif
     });
@@ -323,7 +323,7 @@ void setBluetoothCallbacks()
     {
         alarmManager.setAlarm(targetEpoch);
 
-        #ifdef DEBUG_ENABLE
+        #if DEBUG_ENABLE
         Serial.println("Alarm target updated: targetEpoch=" + String(targetEpoch));
         #endif
     });
@@ -336,7 +336,7 @@ void setBluetoothCallbacks()
             {
                 wifi.begin();
 
-                #ifdef DEBUG_ENABLE
+                #if DEBUG_ENABLE
                 Serial.println("WiFi enabled.");
                 #endif
             }
@@ -345,7 +345,7 @@ void setBluetoothCallbacks()
         {
             wifi.stop();
 
-            #ifdef DEBUG_ENABLE
+            #if DEBUG_ENABLE
             Serial.println("WiFi disabled.");
             #endif
         }
