@@ -144,6 +144,10 @@ void setAlarmManagerCallbacks()
 
         deviceConfig.alarmArmed       = armed;
         deviceConfig.alarmTargetEpoch = targetEpoch;
+        
+        #ifdef DEBUG_ENABLE
+        Serial.println("Alarm changed: armed=" + String(armed) + ", targetEpoch=" + String(targetEpoch));
+        #endif
     });
 }
 
@@ -248,6 +252,10 @@ void setWifiCallbacks()
         }
     
         storage.end();
+
+        #ifdef DEBUG_ENABLE
+        Serial.println("Device configuration updated.");
+        #endif
     });
 
     wifi.setMeasurementProvider([]() -> String
@@ -291,6 +299,10 @@ void setWifiCallbacks()
         json += boolField("vibration",    measurement.vibration);
         json += "}";
 
+        #ifdef DEBUG_ENABLE
+        Serial.println("Value sent over WiFi : " + json);
+        #endif
+
         return json;
     });
 }
@@ -301,11 +313,19 @@ void setBluetoothCallbacks()
     bluetooth.setTimeSyncCallback([](uint32_t epoch)
     {
         systemClock.sync(epoch);
+
+        #ifdef DEBUG_ENABLE
+        Serial.println("Time synchronized: epoch=" + String(epoch));
+        #endif
     });
 
     bluetooth.setAlarmTargetCallback([](uint32_t targetEpoch)
     {
         alarmManager.setAlarm(targetEpoch);
+
+        #ifdef DEBUG_ENABLE
+        Serial.println("Alarm target updated: targetEpoch=" + String(targetEpoch));
+        #endif
     });
 
     bluetooth.setWifiControlCallback([](bool enable)
@@ -315,11 +335,19 @@ void setBluetoothCallbacks()
             if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
             {
                 wifi.begin();
+
+                #ifdef DEBUG_ENABLE
+                Serial.println("WiFi enabled.");
+                #endif
             }
         }
         else
         {
             wifi.stop();
+
+            #ifdef DEBUG_ENABLE
+            Serial.println("WiFi disabled.");
+            #endif
         }
     });
 }
@@ -822,6 +850,9 @@ void printDebugInfo()
     #else
         Serial.println("Region: unknown");
     #endif
+
+    Serial.println("--- AES ---");
+    for (int i = 0; i < 16; i++) { Serial.print(deviceConfig.aesKey[i], HEX); if (i < 15) Serial.print(":"); }
     Serial.println("========================================");
 }
 #endif
@@ -880,10 +911,10 @@ void loop()
     {
         last1000Ms = now;
         
-        if ((isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT)
-                            && bluetooth.hasConnectedClient())
-                            || !screen.isSleeping()
-                            || DEBUG_ENABLE)
+        if ((isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT) && bluetooth.hasConnectedClient()) 
+          ||(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) && wifi.hasConnectedClient())
+          ||    !screen.isSleeping()
+          ||    DEBUG_ENABLE)
         {
             handleMeasurements();
         }
