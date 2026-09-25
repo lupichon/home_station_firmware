@@ -413,6 +413,32 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
     </div>
 
     <!-- =====================================================
+     SECURITY
+     ===================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">Security</div>
+
+        <div class="field">
+            <label for="aesKey">AES-128 Encryption Key</label>
+            <div class="input-row">
+                <input
+                    type="password"
+                    id="aesKey"
+                    name="aesKey"
+                    maxlength="32"
+                    autocomplete="off"
+                    placeholder="00112233445566778899AABBCCDDEEFF"
+                >
+                <button type="button" class="toggle-button" onclick="togglePassword('aesKey', this)">Show</button>
+            </div>
+            <p class="hint">32 hexadecimal characters (AES-128).</p>
+        </div>
+
+    </div>
+
+    <!-- =====================================================
          Sensors
          ===================================================== -->
 
@@ -609,6 +635,13 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
         }
         markInvalid('wifiApPassword', false);
 
+        if (!isHex(config.aesKey, 32)) {
+            markInvalid('aesKey', true);
+            showAlert('Invalid AES Key. Must be exactly 32 hexadecimal characters.', 'error');
+            return false;
+        }
+        markInvalid('aesKey', false);
+
         return true;
     }
 
@@ -634,6 +667,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             wifiControlUUID:    document.getElementById('wifiControlUUID').value.trim(),
             wifiApSSID:         document.getElementById('wifiApSSID').value.trim(),
             wifiApPassword:     document.getElementById('wifiApPassword').value,
+            aesKey:             document.getElementById('aesKey').value.trim(),
             enabledSensorsMask: getSensorsMask(),
             enabledCommsMask:   getCommsMask()
         };
@@ -735,6 +769,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 setValue('wifiControlUUID',    config.wifiControlUUID);
                 setValue('wifiApSSID',         config.wifiApSSID);
                 setValue('wifiApPassword',     config.wifiApPassword);
+                setValue('aesKey',             config.aesKey);
                 setSensorsMask(config.enabledSensorsMask ?? 0xFFFF);
                 setCommsMask(config.enabledCommsMask ?? 0x07);
             })

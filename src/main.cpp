@@ -5,6 +5,9 @@
  * @date    2026-07-16
  */
 
+//TODO: Tester l'encryption AES-128 (format des données envoyées, réception...)
+            // Changer la clée via l'interface web aussi
+
 #include <Arduino.h>
 
 // ==================== Core ====================
@@ -16,6 +19,8 @@
 #include "core/alarm_manager.hpp"
 #include "core/clock.hpp"
 #include "core/device_config.hpp"
+#include "core/data_serializer.hpp"
+#include "core/crypto.hpp"
 
 // ==================== Sensors ====================
 #include "sensors/BH1750/driver_BH1750.hpp"
@@ -29,7 +34,6 @@
 #include "sensors/SGP41/driver_SGP41.hpp"
 
 // ==================== Communication ====================
-#include "communication/data_serializer.hpp"
 #include "communication/bluetooth/bluetooth.hpp"
 #include "communication/wifi/wifi.hpp"
 #include "communication/LoRaWAN/lorawan.hpp"
@@ -98,6 +102,9 @@ DeviceConfig    deviceConfig;
 
 uint8_t buffer[BUFFER_SIZE];
 size_t  dataSize = 0;
+
+uint8_t encryptedBuffer[AES_IV_SIZE + BUFFER_SIZE];
+size_t encryptedDataSize = 0;
 
 // ==================== Task timing ====================
 constexpr unsigned long TASK_10_MS   = 10;
@@ -230,52 +237,20 @@ void setWifiCallbacks()
             storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
             deviceConfig.enabledCommsMask = newDeviceConfig.enabledCommsMask;
         }
+
+        if (newDeviceConfig.aesKey != deviceConfig.aesKey)
+        {
+            storage.putBytes(Storage::aesKeyKey, newDeviceConfig.aesKey, sizeof(newDeviceConfig.aesKey));
+            memcpy(deviceConfig.aesKey, newDeviceConfig.aesKey, sizeof(deviceConfig.aesKey));
+        }
     
         storage.end();
     });
 
     wifi.setMeasurementProvider([]() -> String
     {
-        auto floatField = [](const char* key, float val) -> String
-        {
-            String s = "\"";
-            s += key;
-            s += "\":";
-            s += isnan(val) ? "null" : String(val, 2);
-            return s;
-        };
-
-        auto intField = [](const char* key, uint16_t val) -> String
-        {
-            String s = "\"";
-            s += key;
-            s += "\":";
-            s += val;
-            return s;
-        };
-
-        auto boolField = [](const char* key, bool val) -> String
-        {
-            return "\"" + String(key) + "\":" + String(val ? 1 : 0);
-        };
-
-        String json = "{";
-        json += "\"timestamp\":" + String(measurement.timestamp)   + ",";
-        json += floatField("temperature", measurement.temperature) + ",";
-        json += floatField("humidity",    measurement.humidity)    + ",";
-        json += floatField("luminosity",  measurement.luminosity)  + ",";
-        json += floatField("pressure",    measurement.pressure)    + ",";
-        json += intField("co2",           measurement.co2)         + ",";
-        json += intField("gasRaw",        measurement.gasRaw)      + ",";
-        json += intField("vocIndex",      measurement.vocIndex)    + ",";
-        json += intField("noxIndex",      measurement.noxIndex)    + ",";
-        json += boolField("motion",       measurement.motion)      + ",";
-        json += boolField("sound",        measurement.sound)       + ",";
-        json += boolField("obstacle",     measurement.obstacle)    + ",";
-        json += boolField("vibration",    measurement.vibration);
-        json += "}";
-
-        return json;
+        if (encryptedDataSize == 0) return "{}";
+        return base64::encode(encryptedBuffer, encryptedDataSize);
     });
 }
 
@@ -423,6 +398,7 @@ void initStorage()
     loadOrCreateConfig(storage, Storage::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
     loadOrCreateConfig(storage, Storage::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
     loadOrCreateConfig(storage, Storage::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
+    loadOrCreateConfig(storage, Storage::aesKeyKey,              "AES Key",                          deviceConfig.aesKey,            sizeof(deviceConfig.aesKey));
 
     deviceConfig.alarmArmed         = storage.getBool(Storage::alarmArmedKey,  false);
     deviceConfig.alarmTargetEpoch   = storage.getUInt(Storage::alarmTargetKey, 0);
@@ -694,7 +670,8 @@ void handleMeasurements()
     
     status.sensorOK = success;
 
-    dataSize = serialize(measurement, buffer, sizeof(buffer));
+    dataSize          = serialize(measurement, buffer, sizeof(buffer));
+    encryptedDataSize = encrypt(buffer, dataSize, deviceConfig.aesKey, encryptedBuffer, measurement.timestamp);
 }
 
 // Handle the Bluetooth communication loop, including sending data to connected clients
@@ -718,7 +695,7 @@ void handleBluetooth()
         return;
     }
 
-    status.bluetoothOK = bluetooth.send(const_cast<uint8_t*>(buffer), dataSize);
+    status.bluetoothOK = bluetooth.send(encryptedBuffer, encryptedDataSize);
 
     #if DEBUG_ENABLE
     if (status.bluetoothOK) 
@@ -732,6 +709,7 @@ void handleBluetooth()
     #endif
 }
 
+#if DEBUG_ENABLE
 // =================== Debug Functions ====================
 void printDebugInfo()
 {
@@ -791,6 +769,7 @@ void printDebugInfo()
     #endif
     Serial.println("========================================");
 }
+#endif
 
 // ==================== Setup and Loop ====================
 void setup()

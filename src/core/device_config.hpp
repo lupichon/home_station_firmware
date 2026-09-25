@@ -49,6 +49,9 @@ struct DeviceConfig
 
     // ── Communication ────────────────────────────────────────────────────
     uint8_t enabledCommsMask = 0x07; // Bitmask of enabled communication interfaces (bit 0: LoRaWAN, bit 1: Bluetooth, bit 2: WiFi AP)
+
+    // ── Crypto ─────────────────────────────────────────────────────────────
+    uint8_t aesKey[16];   // AES-128 key for encrypting/decrypting data
 };
 
 enum SensorsBit : uint16_t

@@ -292,6 +292,10 @@ inline void WiFiCommunication::handleGetConfig()
     json += deviceConfig->wifiApPassword;
     json += "\"";
 
+    json += ",\"aesKey\":\"";
+    json += bytesToHex(deviceConfig->aesKey, sizeof(deviceConfig->aesKey));
+    json += "\"";
+
     json += "}";
 
     // Send the JSON response to the client
@@ -330,9 +334,10 @@ inline void WiFiCommunication::handlePostConfig()
     String characteristicUUID      = doc["characteristicUUID"] | "";
     String timeSyncUUID            = doc["timeSyncUUID"]       | "";
     String alarmTargetUUID         = doc["alarmTargetUUID"]    | "";
-    String wifiControlUUID         = doc["wifiControlUUID"]       | "";
+    String wifiControlUUID         = doc["wifiControlUUID"]    | "";
     String wifiApSSID              = doc["wifiApSSID"]         | "";
     String wifiApPassword          = doc["wifiApPassword"]     | "";
+    String aesKey                  = doc["aesKey"]             | "";
 
     // Validate the extracted configuration parameters
     if (utcOffset < -12 || utcOffset > 14)
@@ -384,6 +389,12 @@ inline void WiFiCommunication::handlePostConfig()
         return;
     }
 
+    if (!isHexString(aesKey, 32))
+    {
+        server.send(400, "application/json", "{\"ok\":false,\"error\":\"aesKey must be 32 hex characters\"}");
+        return;
+    }
+
     // Create a new DeviceConfig instance with the updated values
     DeviceConfig newDeviceConfig = *deviceConfig; 
 
@@ -401,6 +412,7 @@ inline void WiFiCommunication::handlePostConfig()
     hexToBytes(devEui.c_str(), newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
     hexToBytes(appEui.c_str(), newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
     hexToBytes(appKey.c_str(), newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));
+    hexToBytes(aesKey.c_str(), newDeviceConfig.aesKey, sizeof(newDeviceConfig.aesKey));
 
     // If a callback for configuration saving is set, call it with the new configuration
     if (onConfigSaved) onConfigSaved(newDeviceConfig);

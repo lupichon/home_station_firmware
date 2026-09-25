@@ -162,6 +162,7 @@ class Storage
         static constexpr const char* enabledSensorsMaskKey  = "enSensMask";
         static constexpr const char* enabledCommsMaskKey    = "enCommMask";
         static constexpr const char* wifiControlUUIDKey     = "wiCoUUID";
+        static constexpr const char* aesKeyKey              = "aesKey";
         
     // ── Private members ───────────────────────────────────────────────────
     private:
