@@ -7,6 +7,8 @@
 
 /*TODO: *** Tester l'encryption AES-128 (format des données envoyées, réception...)
             Changer la clée via l'interface web aussi
+            Seulement le bluetooth est crypté (le wifi a un mot de passe)
+            Faut-il chiffre également pour le lorawan ????? 
 
         *** Tester la mise à jour du firmware via l'interface web
 
@@ -244,20 +246,52 @@ void setWifiCallbacks()
             storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
             deviceConfig.enabledCommsMask = newDeviceConfig.enabledCommsMask;
         }
-
-        if (newDeviceConfig.aesKey != deviceConfig.aesKey)
-        {
-            storage.putBytes(Storage::aesKeyKey, newDeviceConfig.aesKey, sizeof(newDeviceConfig.aesKey));
-            memcpy(deviceConfig.aesKey, newDeviceConfig.aesKey, sizeof(deviceConfig.aesKey));
-        }
     
         storage.end();
     });
 
     wifi.setMeasurementProvider([]() -> String
     {
-        if (encryptedDataSize == 0) return "{}";
-        return base64::encode(encryptedBuffer, encryptedDataSize);
+        auto floatField = [](const char* key, float val) -> String
+        {
+            String s = "\"";
+            s += key;
+            s += "\":";
+            s += isnan(val) ? "null" : String(val, 2);
+            return s;
+        };
+
+        auto intField = [](const char* key, uint16_t val) -> String
+        {
+            String s = "\"";
+            s += key;
+            s += "\":";
+            s += val;
+            return s;
+        };
+
+        auto boolField = [](const char* key, bool val) -> String
+        {
+            return "\"" + String(key) + "\":" + String(val ? 1 : 0);
+        };
+
+        String json = "{";
+        json += "\"timestamp\":" + String(measurement.timestamp)   + ",";
+        json += floatField("temperature", measurement.temperature) + ",";
+        json += floatField("humidity",    measurement.humidity)    + ",";
+        json += floatField("luminosity",  measurement.luminosity)  + ",";
+        json += floatField("pressure",    measurement.pressure)    + ",";
+        json += intField("co2",           measurement.co2)         + ",";
+        json += intField("gasRaw",        measurement.gasRaw)      + ",";
+        json += intField("vocIndex",      measurement.vocIndex)    + ",";
+        json += intField("noxIndex",      measurement.noxIndex)    + ",";
+        json += boolField("motion",       measurement.motion)      + ",";
+        json += boolField("sound",        measurement.sound)       + ",";
+        json += boolField("obstacle",     measurement.obstacle)    + ",";
+        json += boolField("vibration",    measurement.vibration);
+        json += "}";
+
+        return json;
     });
 }
 
@@ -454,7 +488,9 @@ void initCommunication()
                           deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey, 
                           [](uint8_t* buf, uint8_t maxLen) -> uint8_t
                           {
-                              return static_cast<uint8_t>(serialize(measurement, buf, maxLen));
+                              uint8_t len = (dataSize < maxLen) ? static_cast<uint8_t>(dataSize) : maxLen;
+                              memcpy(buf, buffer, len);
+                              return len;
                           },
                           lorawanAutoUplinkInterval_S);
         setLoRaWANCallbacks(); 

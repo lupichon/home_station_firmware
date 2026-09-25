@@ -498,15 +498,6 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
 
     <div class="alert" id="alert"></div>
 
-    <button
-        type="button"
-        class="save-button"
-        style="background:#334155; margin-top:0.75rem;"
-        onclick="window.location.href='/update'"
-    >
-        &#x1F4E6; Firmware Update (OTA)
-    </button>
-
     <div class="footer">HomeStation Configuration Portal</div>
 
 </div>

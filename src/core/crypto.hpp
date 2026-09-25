@@ -10,7 +10,6 @@
 #include <Arduino.h>
 #include <mbedtls/aes.h>
 #include <string.h>
-#include <base64.h>
 
 // ============================================================
 // Constants

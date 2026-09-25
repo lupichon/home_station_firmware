@@ -16,8 +16,10 @@
 #include "../../core/device_config.hpp"
 #include "../../core/configuration_manager.hpp"
 #include "../communication.hpp"
-#include "wifi_config_page.hpp"
-#include "wifi_update_page.hpp"
+#include "./pages/wifi_home_page.hpp"
+#include "./pages/wifi_config_page.hpp"
+#include "./pages/wifi_update_page.hpp"
+#include "./pages/wifi_monitoring_page.hpp"
 
 // ============================================================
 // WiFiCommunication class definition
@@ -43,7 +45,6 @@ class WiFiCommunication : public Communication
         bool sleep; // Flag indicating if the WiFi is currently in sleep mode (off after timeout)
 
         // HTTP route handlers
-        void handleRoot();
         void handleGetConfig();
         void handlePostConfig();
         void handleNotFound();
@@ -52,6 +53,9 @@ class WiFiCommunication : public Communication
         void handleUpdatePage();
         void handleUpdatePost();
         void handleUpdateUpload();
+        void handleHome();
+        void handleConfigPage();
+        void handleMonitoringPage();
 
     // ── Public interface ──────────────────────────────────────────────────
     public:
@@ -174,14 +178,17 @@ inline bool WiFiCommunication::begin()
     }
 
     // Route registration
-    server.on("/",                  HTTP_GET,  [this]() { handleRoot();      });
-    server.on("/api/config",        HTTP_GET,  [this]() { handleGetConfig(); });
-    server.on("/api/config",        HTTP_POST, [this]() { handlePostConfig();});
-    server.on("/api/sensors",       HTTP_GET,  [this]() { handleGetSensors(); });
-    server.on("/api/measurement",   HTTP_GET,  [this]() { handleGetMeasurement(); });
-    server.on("/update",            HTTP_GET,  [this]() { handleUpdatePage(); });
-    server.on("/update",            HTTP_POST, [this]() { handleUpdatePost(); });
-    server.onNotFound(                         [this]() { handleNotFound(); });
+    server.on("/",                  HTTP_GET,  [this]() { handleHome();              });
+    server.on("/api/config",        HTTP_GET,  [this]() { handleGetConfig();         });
+    server.on("/api/config",        HTTP_POST, [this]() { handlePostConfig();        });
+    server.on("/api/sensors",       HTTP_GET,  [this]() { handleGetSensors();        });
+    server.on("/api/measurement",   HTTP_GET,  [this]() { handleGetMeasurement();    });
+    server.on("/monitoring",        HTTP_GET,  [this]() { handleMonitoringPage();    });
+    server.on("/config",            HTTP_GET,  [this]() { handleConfigPage();        });
+    server.on("/update",            HTTP_GET,  [this]() { handleUpdatePage();        });
+    server.on("/update",            HTTP_POST, [this]() { handleUpdatePost();        },
+                                               [this]() { handleUpdateUpload();      });    
+    server.onNotFound(                         [this]() { handleNotFound();          });
 
     // Start the HTTP server
     server.begin();
@@ -223,12 +230,6 @@ inline bool WiFiCommunication::send(uint8_t* data, size_t size)
 // ─────────────────────────────────────────────────────────────────────────────
 // HTTP Route Handlers
 // ─────────────────────────────────────────────────────────────────────────────
-
-inline void WiFiCommunication::handleRoot()
-{
-    // Serve the WiFi configuration page (HTML) to the client
-    server.send_P(200, "text/html", WIFI_CONFIG_PAGE);
-}
 
 inline void WiFiCommunication::handleGetConfig()
 {
@@ -500,6 +501,21 @@ inline void WiFiCommunication::handleUpdateUpload()
             Serial.println("OTA: end failed");
         }
     }
+}
+
+inline void WiFiCommunication::handleHome()
+{
+    server.send_P(200, "text/html", WIFI_HOME_PAGE);
+}
+
+inline void WiFiCommunication::handleConfigPage()
+{
+    server.send_P(200, "text/html", WIFI_CONFIG_PAGE);
+}
+
+inline void WiFiCommunication::handleMonitoringPage()
+{
+    server.send_P(200, "text/html", WIFI_MONITORING_PAGE);
 }
 
 inline bool WiFiCommunication::hasConnectedClient() const 
