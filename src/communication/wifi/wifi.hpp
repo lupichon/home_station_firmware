@@ -15,6 +15,7 @@
 
 #include "../../core/device_config.hpp"
 #include "../../core/configuration_manager.hpp"
+#include "../../core/firmware_version.hpp"
 #include "../communication.hpp"
 #include "./pages/wifi_home_page.hpp"
 #include "./pages/wifi_config_page.hpp"
@@ -302,6 +303,10 @@ inline void WiFiCommunication::handleGetConfig()
 
     json += ",\"aesKey\":\"";
     json += bytesToHex(deviceConfig->aesKey, sizeof(deviceConfig->aesKey));
+    json += "\"";
+
+    json += ",\"firmwareVersion\":\"";
+    json += FIRMWARE_VERSION_STRING;
     json += "\"";
 
     json += "}";

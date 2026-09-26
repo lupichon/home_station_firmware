@@ -126,9 +126,21 @@ static const char WIFI_HOME_PAGE[] PROGMEM = R"rawhtml(
         <span class="icon">&#11014;&#65039;</span> Firmware update
     </a>
 
-    <div class="footer">HomeStation Access Point</div>
+    <div class="footer" id="footer">HomeStation Access Point</div>
 
 </div>
+
+<script>
+fetch('/api/config')
+    .then(r => r.json())
+    .then(config => {
+        const footer = document.getElementById('footer');
+        if (config.firmwareVersion) {
+            footer.textContent = 'HomeStation Access Point — v' + config.firmwareVersion;
+        }
+    })
+    .catch(() => {});
+</script>
 
 </body>
 </html>

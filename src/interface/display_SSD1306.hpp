@@ -14,6 +14,7 @@
 
 #include "../core/measurement.hpp"
 #include "../core/clock.hpp"
+#include "../core/firmware_version.hpp"
 
 // ============================================================
 // DisplaySSD1306 class definition
@@ -40,13 +41,9 @@ class DisplaySSD1306
             VIBRATION,
             PRESSURE,
             VOC,
-            NOX
+            NOX, 
+            VERSION
         };
-
-        static constexpr uint8_t WIDTH = 128;                       // Screen width in pixels
-        static constexpr uint8_t HEIGHT = 64;                       // Screen height in pixels
-        static constexpr uint8_t I2C_ADDRESS = 0x3C;                // I2C address of the SSD1306 controller
-        static constexpr unsigned long SLEEP_TIMEOUT_MS = 60000;    // Idle delay before the screen goes to sleep
 
         /**
          * @brief Constructor for DisplaySSD1306.
@@ -93,6 +90,19 @@ class DisplaySSD1306
         bool sleeping;                   // Whether the screen is currently sleeping
         unsigned long lastActivityTime;  // Timestamp of the last user interaction
         Clock &clock;                    // Reference to the shared Clock instance
+
+        static constexpr uint8_t WIDTH = 128;                       // Screen width in pixels
+        static constexpr uint8_t HEIGHT = 64;                       // Screen height in pixels
+        static constexpr uint8_t I2C_ADDRESS = 0x3C;                // I2C address of the SSD1306 controller
+        static constexpr unsigned long SLEEP_TIMEOUT_MS = 60000;    // Idle delay before the screen goes to sleep
+
+        static constexpr uint8_t VALUE_TEXT_SIZE = 2;               // Text size for the measurement values
+        static constexpr uint8_t VALUE_CURSOR_X = 0;                // X-coordinate for the measurement value cursor
+        static constexpr uint8_t VALUE_CURSOR_Y = 25;               // Y-coordinate for the measurement value cursor
+        static constexpr uint8_t TITLE_TEXT_SIZE = 1;               // Text size for the title
+        static constexpr uint8_t TITLE_CURSOR_X = 0;                // X-coordinate for the title cursor
+        static constexpr uint8_t TITLE_CURSOR_Y = 0;                // Y-coordinate for the title cursor
+        static constexpr uint8_t TITLE_SEPARATOR_Y = 10;            // Y-coordinate for the title separator line
 
         /**
          * @brief Render the CLOCK page (current time and date).
@@ -173,6 +183,12 @@ class DisplaySSD1306
         void displayVibration(bool detected);
 
         /**
+         * @brief Render the VERSION page.
+         * @param version Firmware version string.
+         */
+        void displayVersion(const char* version);
+
+        /**
          * @brief Draw the common page header (title text and separator line).
          * @param title Title text to display at the top of the page.
          */
@@ -195,6 +211,13 @@ class DisplaySSD1306
          * @param detected          Boolean state to display.
          */
         void displayValue(String title, String textIfDetected, String textIfNotDetected, bool detected);
+
+        /**
+         * @brief Render a titled text value.
+         * @param title Page title.
+         * @param text  Text to display.
+         */
+        void displayValue(String title, String text);
 
         /**
          * @brief Turn the screen off and mark it as sleeping.
@@ -236,8 +259,8 @@ inline bool DisplaySSD1306::begin()
 
     screen.setTextColor(SSD1306_WHITE);
 
-    screen.setTextSize(1);
-    screen.setCursor(0, 0);
+    screen.setTextSize(TITLE_TEXT_SIZE);
+    screen.setCursor(TITLE_CURSOR_X, TITLE_CURSOR_Y);
     screen.println("HomeStation");
 
     screen.display();
@@ -318,6 +341,10 @@ inline void DisplaySSD1306::update(const Measurement& measurement)
         case Page::GASLEVEL:
             displayGasLevel(measurement.gasRaw);
             break;
+
+        case Page::VERSION:
+            displayVersion(FIRMWARE_VERSION_STRING);
+            break;
     }
 
     screen.display();
@@ -380,6 +407,10 @@ inline void DisplaySSD1306::nextPage()
             break;
 
         case Page::VIBRATION:
+            currentPage = Page::VERSION;
+            break;
+
+        case Page::VERSION:
             currentPage = Page::CLOCK;
             break;
     }
@@ -391,15 +422,15 @@ inline void DisplaySSD1306::nextPage()
 
 inline void DisplaySSD1306::displayTitle(const char* title)
 {
-    screen.setTextSize(1);
-    screen.setCursor(0, 0);
+    screen.setTextSize(TITLE_TEXT_SIZE);
+    screen.setCursor(TITLE_CURSOR_X, TITLE_CURSOR_Y);
     screen.println(title);
 
     screen.drawLine(
-        0,
-        10,
+        TITLE_CURSOR_X,
+        TITLE_SEPARATOR_Y,
         WIDTH - 1,
-        10,
+        TITLE_SEPARATOR_Y,
         SSD1306_WHITE
     );
 }
@@ -408,8 +439,8 @@ inline void DisplaySSD1306::displayValue(String title, String unit, int precisio
 {
     displayTitle(title.c_str());
 
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
+    screen.setTextSize(VALUE_TEXT_SIZE);
+    screen.setCursor(VALUE_CURSOR_X, VALUE_CURSOR_Y);
 
     if (isnan(value))
     {
@@ -427,8 +458,8 @@ inline void DisplaySSD1306::displayValue(String title, String textIfDetected, St
 {
     displayTitle(title.c_str());
 
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
+    screen.setTextSize(VALUE_TEXT_SIZE);
+    screen.setCursor(VALUE_CURSOR_X, VALUE_CURSOR_Y);
 
     if (detected)
     {
@@ -440,6 +471,16 @@ inline void DisplaySSD1306::displayValue(String title, String textIfDetected, St
     }
 }
 
+inline void DisplaySSD1306::displayValue(String title, String text)
+{
+    displayTitle(title.c_str());
+    
+    screen.setTextSize(VALUE_TEXT_SIZE);
+    screen.setCursor(VALUE_CURSOR_X, VALUE_CURSOR_Y);
+
+    screen.println(text);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Pages
 // ─────────────────────────────────────────────────────────────────────────────
@@ -448,8 +489,8 @@ inline void DisplaySSD1306::displayClock(uint32_t epoch)
 {
     displayTitle("Clock");
 
-    screen.setTextSize(2);
-    screen.setCursor(0, 25);
+    screen.setTextSize(VALUE_TEXT_SIZE);
+    screen.setCursor(VALUE_CURSOR_X, VALUE_CURSOR_Y);
 
     if (!clock.isSynchronized())
     {
@@ -470,7 +511,7 @@ inline void DisplaySSD1306::displayClock(uint32_t epoch)
  
 inline void DisplaySSD1306::displayTemperature(float value)
 {
-    displayValue("Temperature", " C", 1, value);
+    displayValue("Temperature", "C", 1, value);
 }
 
 
@@ -527,6 +568,11 @@ inline void DisplaySSD1306::displayVibration(bool detected)
 inline void DisplaySSD1306::displayPressure(float value)
 {
     displayValue("Pressure", "hPa", 1, value);
+}
+
+inline void DisplaySSD1306::displayVersion(const char* version)
+{
+    displayValue("Version", String("v") + version);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

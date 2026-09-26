@@ -14,6 +14,8 @@
 
         *** Tester le redémarrage automatique de l'esp (avec un delay(11000))
             pour voir si le watchdog fonctionne correctement. 
+
+        *** Tester l'affichage de la version sur l'AP et sur l'écran SSD.
 */        
 
 #include <Arduino.h>
