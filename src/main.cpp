@@ -20,6 +20,8 @@
         *** Tester la page de statut du système via l'interface web
 
         *** Tester l'importation et l'exportation de la configuration via l'interface web
+
+        *** Tester le redémarrage automatique des capteurs en cas d'échec (3) de lecture
 */        
 
 #include <Arduino.h>
@@ -160,6 +162,9 @@ constexpr size_t COMM_COUNT   = sizeof(communications) / sizeof(communications[0
 
 // ==================== Sensor Read Status ====================
 bool sensorLastReadOk[SENSOR_COUNT] = {false};
+
+constexpr int MAX_CONSECUTIVE_FAILED_READS = 3;
+int sensorFailureCount[SENSOR_COUNT] = {0};
 
 // ============== Utility functions ====================
 
@@ -672,7 +677,7 @@ void initCommunication()
 // Initialize all sensors based on the enabled sensors mask in the device configuration
 void initSensors()
 {
-    for(int i = 0; i < sensorCount; i++)
+    for(int i = 0; i < SENSOR_COUNT; i++)
     {
         if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i))) continue; 
 
@@ -696,7 +701,7 @@ void initSensors()
 // Initialize the watchdog timer to automatically reset the ESP if it becomes unresponsive.
 void initWatchdog()
 {
-    constexpr int WATCHDOG_TIMEOUT_S = 10; 
+    constexpr int WATCHDOG_TIMEOUT_S = 30; 
     esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);
     esp_task_wdt_add(NULL); 
 }
@@ -862,8 +867,7 @@ void handleMeasurements()
     measurement.timestamp = systemClock.now();
     for(int i = 0; i < SENSOR_COUNT; i++)
     {
-        bool sensorEnabled = isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i));
-        if (!sensorEnabled)
+        if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i)))
         {
             sensorLastReadOk[i] = false;
             continue;
@@ -871,11 +875,24 @@ void handleMeasurements()
 
         Sensor& sensor = *sensors[i];
 
-        if(sensor.isInitialized())
+        if (!sensor.isInitialized())
         {
-            bool successSensor = sensor.read(measurement);
-            sensorLastReadOk[i] = successSensor;
-            success &= successSensor;
+            // Not initialized: retry begin() on every cycle
+            sensor.begin();
+            sensorLastReadOk[i] = false;
+            sensorFailureCount[i] = 0;
+            success = false;
+            continue;
+        }
+
+        // Initialized: attempt a read
+        bool successSensor = sensor.read(measurement);
+        sensorLastReadOk[i] = successSensor;
+        success &= successSensor;
+
+        if (successSensor)
+        {
+            sensorFailureCount[i] = 0;
 
             #if DEBUG_ENABLE 
             Serial.println(sensor.displayValue(measurement));
@@ -883,8 +900,17 @@ void handleMeasurements()
         }
         else
         {
-            sensorLastReadOk[i] = false;
-            success = false;
+            sensorFailureCount[i]++;
+
+            #if DEBUG_ENABLE
+            Serial.println(String(sensor.getName()) + ": failed to read (" + String(sensorFailureCount[i]) + "/" + String(MAX_CONSECUTIVE_FAILED_READS) + ")");
+            #endif
+
+            if (sensorFailureCount[i] >= MAX_CONSECUTIVE_FAILED_READS)
+            {
+                sensor.begin();
+                sensorFailureCount[i] = 0;
+            }
         }
     }
     
