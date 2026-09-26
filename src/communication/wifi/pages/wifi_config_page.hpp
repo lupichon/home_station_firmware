@@ -473,6 +473,20 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
         </p>
     </div>
 
+    <div class="section">
+        <div class="section-title">Backup</div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="toggle-button" style="flex: 1; padding: 0.6rem;" onclick="exportConfig()">
+                &#128190; Export config
+            </button>
+            <button type="button" class="toggle-button" style="flex: 1; padding: 0.6rem;" onclick="document.getElementById('importFile').click()">
+                &#128194; Import config
+            </button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importConfig(event)">
+        <p class="hint">Import only fills the fields below — review and click "Save &amp; Reboot" to apply.</p>
+    </div>
+
     <!-- =====================================================
          REBOOT NOTICE
          ===================================================== -->
@@ -774,6 +788,71 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 setCommsMask(config.enabledCommsMask ?? 0x07);
             })
             .catch(() => showAlert('Unable to load configuration.', 'error'));
+    }
+
+    // ========================================================
+    // Export configuration
+    // ========================================================
+
+    function exportConfig() {
+        fetch('/api/config')
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(config => {
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'homestation_config.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch(() => showAlert('Failed to export configuration.', 'error'));
+    }
+
+    // ========================================================
+    // Import configuration
+    // ========================================================
+
+    function importConfig(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const config = JSON.parse(e.target.result);
+
+                setValue('utcOffset',          config.utcOffset ?? 0);
+                setValue('devEui',             config.devEui);
+                setValue('appEui',             config.appEui);
+                setValue('appKey',             config.appKey);
+                setValue('bleDeviceName',      config.bleDeviceName);
+                setValue('serviceUUID',        config.serviceUUID);
+                setValue('characteristicUUID', config.characteristicUUID);
+                setValue('timeSyncUUID',       config.timeSyncUUID);
+                setValue('alarmTargetUUID',    config.alarmTargetUUID);
+                setValue('wifiControlUUID',    config.wifiControlUUID);
+                setValue('wifiApSSID',         config.wifiApSSID);
+                setValue('wifiApPassword',     config.wifiApPassword);
+                setValue('aesKey',             config.aesKey);
+                setSensorsMask(config.enabledSensorsMask ?? 0xFFFF);
+                setCommsMask(config.enabledCommsMask ?? 0x07);
+
+                showAlert('Configuration imported. Review the fields and click "Save & Reboot" to apply.', 'success');
+            } catch (err) {
+                showAlert('Invalid configuration file.', 'error');
+            }
+        };
+
+        reader.onerror = () => {
+            showAlert('Failed to read the file.', 'error');
+        };
+
+        reader.readAsText(file);
+
+        // Reset the input so the same file can be re-imported later if needed
+        event.target.value = '';
     }
 
     // ========================================================

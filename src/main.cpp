@@ -16,6 +16,10 @@
             pour voir si le watchdog fonctionne correctement. 
 
         *** Tester l'affichage de la version sur l'AP et sur l'écran SSD.
+
+        *** Tester la page de statut du système via l'interface web
+
+        *** Tester l'importation et l'exportation de la configuration via l'interface web
 */        
 
 #include <Arduino.h>
