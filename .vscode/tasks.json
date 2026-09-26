@@ -1,0 +1,48 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build (no bump)",
+            "type": "shell",
+            "command": "$HOME/.platformio/penv/bin/platformio run",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build (bump patch)",
+            "type": "shell",
+            "command": "BUMP=patch $HOME/.platformio/penv/bin/platformio run",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build (bump minor)",
+            "type": "shell",
+            "command": "BUMP=minor $HOME/.platformio/penv/bin/platformio run",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build (bump major)",
+            "type": "shell",
+            "command": "BUMP=major $HOME/.platformio/penv/bin/platformio run",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

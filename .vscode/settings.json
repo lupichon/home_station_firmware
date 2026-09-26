@@ -1,3 +1,9 @@
 {
-    "python.analysis.ignore": ["copy_firmware_to_root.py"]
+    "VsCodeTaskButtons.showCounter": true,
+    "VsCodeTaskButtons.tasks": [
+        { "label": "$(rocket) Build", "task": "Build (no bump)", "tooltip": "Build without version bump" },
+        { "label": "$(arrow-up) Patch", "task": "Build (bump patch)", "tooltip": "Build and bump patch version" },
+        { "label": "$(arrow-up) Minor", "task": "Build (bump minor)", "tooltip": "Build and bump minor version" },
+        { "label": "$(arrow-up) Major", "task": "Build (bump major)", "tooltip": "Build and bump major version" }
+    ]
 }

@@ -30,6 +30,7 @@
 #include "core/device_config.hpp"
 #include "core/data_serializer.hpp"
 #include "core/crypto.hpp"
+#include "core/firmware_version.hpp"
 
 // ==================== Sensors ====================
 #include "sensors/BH1750/driver_BH1750.hpp"
@@ -55,6 +56,23 @@
 
 // ==================== Debug ====================
 #define DEBUG_ENABLE 1
+
+// ============== Firmware Version ==============
+#ifndef FIRMWARE_VERSION_MAJOR
+#define FIRMWARE_VERSION_MAJOR 0
+#endif
+
+#ifndef FIRMWARE_VERSION_MINOR
+#define FIRMWARE_VERSION_MINOR 0
+#endif
+
+#ifndef FIRMWARE_VERSION_PATCH
+#define FIRMWARE_VERSION_PATCH 0
+#endif
+
+#ifndef FIRMWARE_VERSION_STRING
+#define FIRMWARE_VERSION_STRING "0.0.0"
+#endif
 
 // ==================== System ====================
 extern  HardwareSerial Serial;
@@ -797,9 +815,15 @@ void handleWatchdog()
 void printDebugInfo()
 {
     Serial.println("========  HomeStation Firmware  ========");
+
+    Serial.println("--- Firmware Version ---");
+    Serial.println(FIRMWARE_VERSION_STRING);
+
+    Serial.println("--- Sensors ---");
     Serial.print("Number of sensors: ");
     Serial.println(sensorCount);
 
+    Serial.println("--- Communication ---");
     Serial.println(bluetooth.isInitialized()
         ? "Bluetooth started. Device Name: " + String(deviceConfig.bleDeviceName)
         : "Bluetooth not started.");
