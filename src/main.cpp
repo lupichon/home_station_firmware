@@ -20,6 +20,7 @@
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <esp_system.h>
 
 // ==================== Core ====================
 #include "core/measurement.hpp"
@@ -149,6 +150,32 @@ constexpr unsigned long lorawanAutoUplinkInterval_S = 300;
 // ==================== Counts ====================
 int sensorCount = Sensor::getSensorCount();
 int commCount   = Communication::getCommunicationCount();
+
+constexpr size_t SENSOR_COUNT = sizeof(sensors) / sizeof(sensors[0]);
+constexpr size_t COMM_COUNT   = sizeof(communications) / sizeof(communications[0]);
+
+// ==================== Sensor Read Status ====================
+bool sensorLastReadOk[SENSOR_COUNT] = {false};
+
+// ============== Utility functions ====================
+
+String getResetReasonString()
+{
+    switch (esp_reset_reason())
+    {
+        case ESP_RST_POWERON:   return "Power-on";
+        case ESP_RST_EXT:       return "External pin";
+        case ESP_RST_SW:        return "Software reset";
+        case ESP_RST_PANIC:     return "Software panic";
+        case ESP_RST_INT_WDT:   return "Interrupt watchdog";
+        case ESP_RST_TASK_WDT:  return "Task watchdog";
+        case ESP_RST_WDT:       return "Other watchdog";
+        case ESP_RST_DEEPSLEEP: return "Deep sleep wakeup";
+        case ESP_RST_BROWNOUT:  return "Brownout (low voltage)";
+        case ESP_RST_SDIO:      return "SDIO reset";
+        default:                return "Unknown";
+    }
+}
 
 // =================== Callback Setup Functions ====================
 
@@ -322,6 +349,91 @@ void setWifiCallbacks()
         #if DEBUG_ENABLE
         Serial.println("Value sent over WiFi : " + json);
         #endif
+
+        return json;
+    });
+
+    wifi.setStatusProvider([]() -> String
+    {
+        String json = "{";
+
+        // --- System ---
+        json += "\"system\":{";
+        json += "\"uptimeMs\":" + String(millis()) + ",";
+        json += "\"firmwareVersion\":\"" + String(FIRMWARE_VERSION_STRING) + "\",";
+        json += "\"resetReason\":\"" + getResetReasonString() + "\",";
+        json += "\"chipModel\":\"" + String(ESP.getChipModel()) + "\",";
+        json += "\"chipRevision\":" + String(ESP.getChipRevision()) + ",";
+        json += "\"chipCores\":" + String(ESP.getChipCores()) + ",";
+        json += "\"cpuFreqMHz\":" + String(ESP.getCpuFreqMHz()) + ",";
+        json += "\"sdkVersion\":\"" + String(ESP.getSdkVersion()) + "\"";
+        json += "},";
+
+        // --- Memory ---
+        json += "\"memory\":{";
+        json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
+        json += "\"heapSize\":" + String(ESP.getHeapSize()) + ",";
+        json += "\"minFreeHeap\":" + String(ESP.getMinFreeHeap()) + ",";
+        json += "\"maxAllocHeap\":" + String(ESP.getMaxAllocHeap());
+        json += "},";
+
+        // --- Flash ---
+        json += "\"flash\":{";
+        json += "\"flashChipSize\":" + String(ESP.getFlashChipSize()) + ",";
+        json += "\"sketchSize\":" + String(ESP.getSketchSize()) + ",";
+        json += "\"freeSketchSpace\":" + String(ESP.getFreeSketchSpace());
+        json += "},";
+
+        // --- Clock ---
+        json += "\"clock\":{";
+        json += "\"synchronized\":" + String(systemClock.isSynchronized() ? 1 : 0) + ",";
+        json += "\"synchronizedSinceS\":" + String(systemClock.isSynchronized() ? systemClock.isSynchronizedSince() : 0);
+        json += "},";
+
+        // --- Alarm ---
+        json += "\"alarm\":{";
+        json += "\"armed\":" + String(alarmManager.isArmed() ? 1 : 0) + ",";
+        json += "\"ringing\":" + String(alarmManager.isRinging() ? 1 : 0) + ",";
+        json += "\"targetEpoch\":" + String(deviceConfig.alarmTargetEpoch);
+        json += "},";
+
+        // --- Sensors ---
+        json += "\"sensors\":[";
+        for (int i = 0; i < SENSOR_COUNT; i++)
+        {
+            if (i > 0) json += ",";
+            bool enabled = isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i));
+            json += "{\"name\":\"" + String(sensors[i]->getName()) + "\",";
+            json += "\"enabled\":" + String(enabled ? 1 : 0) + ",";
+            json += "\"initialized\":" + String(sensors[i]->isInitialized() ? 1 : 0) + ",";
+            json += "\"lastReadOK\":" + String(sensorLastReadOk[i] ? 1 : 0) + "}";
+        }
+        json += "],";
+
+        // --- Communications ---
+        json += "\"comms\":{";
+
+        json += "\"wifi\":{";
+        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) ? 1 : 0) + ",";
+        json += "\"clients\":" + String(WiFi.softAPgetStationNum());
+        json += "},";
+
+        json += "\"bluetooth\":{";
+        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT) ? 1 : 0) + ",";
+        json += "\"initialized\":" + String(bluetooth.isInitialized() ? 1 : 0) + ",";
+        json += "\"connected\":" + String(bluetooth.hasConnectedClient() ? 1 : 0) + ",";
+        json += "\"lastOK\":" + String(status.bluetoothOK ? 1 : 0);
+        json += "},";
+
+        json += "\"lorawan\":{";
+        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT) ? 1 : 0) + ",";
+        json += "\"initialized\":" + String(lorawan.isInitialized() ? 1 : 0) + ",";
+        json += "\"joined\":" + String(lorawan.isJoined() ? 1 : 0) + ",";
+        json += "\"lastOK\":" + String(status.lorawanOK ? 1 : 0);
+        json += "}";
+
+        json += "}"; // comms
+        json += "}"; // root
 
         return json;
     });
@@ -744,16 +856,21 @@ void handleMeasurements()
 
     bool success = true;
     measurement.timestamp = systemClock.now();
-    for(int i = 0; i < sensorCount; i++)
+    for(int i = 0; i < SENSOR_COUNT; i++)
     {
         bool sensorEnabled = isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i));
-        if (!sensorEnabled) continue;
+        if (!sensorEnabled)
+        {
+            sensorLastReadOk[i] = false;
+            continue;
+        }
 
         Sensor& sensor = *sensors[i];
 
         if(sensor.isInitialized())
         {
             bool successSensor = sensor.read(measurement);
+            sensorLastReadOk[i] = successSensor;
             success &= successSensor;
 
             #if DEBUG_ENABLE 
@@ -762,6 +879,7 @@ void handleMeasurements()
         }
         else
         {
+            sensorLastReadOk[i] = false;
             success = false;
         }
     }

@@ -21,6 +21,7 @@
 #include "./pages/wifi_config_page.hpp"
 #include "./pages/wifi_update_page.hpp"
 #include "./pages/wifi_monitoring_page.hpp"
+#include "./pages/wifi_status_page.hpp"
 
 // ============================================================
 // WiFiCommunication class definition
@@ -40,6 +41,7 @@ class WiFiCommunication : public Communication
         std::function<void(const DeviceConfig&)> onConfigSaved; // Callback function to be called when configuration is saved
         std::function<String()> sensorInfoProvider;             // Callback function to provide sensor information in JSON format
         std::function<String()> measurementProvider;            // Callback to provide current measurement as JSON
+        std::function<String()> statusProvider;                 // Callback to provide current status as JSON
 
         unsigned long lastClientSeenMillis; // Timestamp of the last connected client
         static constexpr unsigned long WIFI_TIMEOUT_MS = 300000; // WIFI timeout (5 minutes)
@@ -57,6 +59,8 @@ class WiFiCommunication : public Communication
         void handleHome();
         void handleConfigPage();
         void handleMonitoringPage();
+        void handleGetStatus();
+        void handleStatusPage();
 
     // ── Public interface ──────────────────────────────────────────────────
     public:
@@ -129,6 +133,12 @@ class WiFiCommunication : public Communication
          * @param cb Callback function that returns a String containing the current measurement in JSON format.
          */
         void setMeasurementProvider(std::function<String()> cb);
+
+        /**
+         * @brief Set a callback function to provide the current status in JSON format.
+         * @param cb Callback function that returns a String containing the current status in JSON format.
+         */
+        void setStatusProvider(std::function<String()> cb);
 };
 
 
@@ -188,7 +198,9 @@ inline bool WiFiCommunication::begin()
     server.on("/config",            HTTP_GET,  [this]() { handleConfigPage();        });
     server.on("/update",            HTTP_GET,  [this]() { handleUpdatePage();        });
     server.on("/update",            HTTP_POST, [this]() { handleUpdatePost();        },
-                                               [this]() { handleUpdateUpload();      });    
+                                               [this]() { handleUpdateUpload();      });
+    server.on("/api/status",        HTTP_GET,  [this]() { handleGetStatus();         });
+    server.on("/status",            HTTP_GET,  [this]() { handleStatusPage();        });
     server.onNotFound(                         [this]() { handleNotFound();          });
 
     // Start the HTTP server
@@ -523,6 +535,21 @@ inline void WiFiCommunication::handleMonitoringPage()
     server.send_P(200, "text/html", WIFI_MONITORING_PAGE);
 }
 
+inline void WiFiCommunication::handleGetStatus()
+{
+    if (!statusProvider)
+    {
+        server.send(200, "application/json", "{}");
+        return;
+    }
+    server.send(200, "application/json", statusProvider());
+}
+
+inline void WiFiCommunication::handleStatusPage()
+{
+    server.send_P(200, "text/html", WIFI_STATUS_PAGE);
+}
+
 inline bool WiFiCommunication::hasConnectedClient() const 
 { 
     // Check if the WiFi communication is initialized and if there is at least one connected client to the WiFi Access Point
@@ -571,4 +598,10 @@ inline void WiFiCommunication::setMeasurementProvider(std::function<String()> cb
 {
     // Set the callback function to provide the current measurement in JSON format
     measurementProvider = cb;
+}
+
+inline void WiFiCommunication::setStatusProvider(std::function<String()> cb)
+{
+    // Set the callback function to provide the current status in JSON format
+    statusProvider = cb;
 }

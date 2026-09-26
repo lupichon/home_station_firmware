@@ -126,6 +126,10 @@ static const char WIFI_HOME_PAGE[] PROGMEM = R"rawhtml(
         <span class="icon">&#11014;&#65039;</span> Firmware update
     </a>
 
+    <a class="nav-link" href="/status">
+        <span class="icon">&#128202;</span> System Status
+    </a>
+
     <div class="footer" id="footer">HomeStation Access Point</div>
 
 </div>
