@@ -223,9 +223,14 @@ inline StatusLED::StatusLED(uint8_t r, uint8_t g, uint8_t b)
 inline void StatusLED::begin()
 {
     // Configure the RGB channels as outputs
-    pinMode(redPin,   OUTPUT);
-    pinMode(greenPin, OUTPUT);
-    pinMode(bluePin,  OUTPUT);
+    ledcSetup(0, 5000, 8);        // channel 0: 5kHz, 8-bit resolution
+    ledcAttachPin(redPin, 0);
+
+    ledcSetup(1, 5000, 8);        // channel 1
+    ledcAttachPin(greenPin, 1);
+
+    ledcSetup(2, 5000, 8);        // channel 2
+    ledcAttachPin(bluePin, 2);
 
     // Start in the idle state
     setState(State::IDLE);
@@ -384,9 +389,9 @@ inline void StatusLED::update()
 inline void StatusLED::setColor(uint8_t r, uint8_t g, uint8_t b)
 {
     // Set the PWM intensity of each RGB channel
-    analogWrite(redPin,   r);
-    analogWrite(greenPin, g);
-    analogWrite(bluePin,  b);
+    ledcWrite(0, r);  // channel 0 -> red
+    ledcWrite(1, g);  // channel 1 -> green
+    ledcWrite(2, b);  // channel 2 -> blue
 }
 
 
