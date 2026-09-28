@@ -5,25 +5,6 @@
  * @date    2026-07-16
  */
 
-/*TODO: *** Tester l'encryption AES-128 (format des données envoyées, réception...)
-            Changer la clée via l'interface web aussi
-            Seulement le bluetooth est crypté (le wifi a un mot de passe)
-            Faut-il chiffre également pour le lorawan ????? 
-
-        *** Tester la mise à jour du firmware via l'interface web
-
-        *** Tester le redémarrage automatique de l'esp (avec un delay(11000))
-            pour voir si le watchdog fonctionne correctement. 
-
-        *** Tester l'affichage de la version sur l'AP et sur l'écran SSD.
-
-        *** Tester la page de statut du système via l'interface web
-
-        *** Tester l'importation et l'exportation de la configuration via l'interface web
-
-        *** Tester le redémarrage automatique des capteurs en cas d'échec (3) de lecture
-*/        
-
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 #include <esp_system.h>

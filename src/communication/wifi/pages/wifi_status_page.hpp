@@ -504,7 +504,7 @@ static const char WIFI_STATUS_PAGE[] PROGMEM = R"rawhtml(
     }
 
     refresh();
-    setInterval(refresh, 2000);
+    setInterval(refresh, 1000);
 
 </script>
 

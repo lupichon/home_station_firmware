@@ -74,6 +74,11 @@ static const char WIFI_UPDATE_PAGE[] PROGMEM = R"rawhtml(
         }
 
         .dropzone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
             border: 2px dashed #475569;
             border-radius: 8px;
             padding: 1.75rem 1rem;
