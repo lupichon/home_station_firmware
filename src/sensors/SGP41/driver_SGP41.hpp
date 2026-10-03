@@ -30,7 +30,7 @@ class SGP41Sensor : public Sensor
 
         unsigned long lastReadTime = 0; // Timestamp of the last measurement attempt
 
-        static constexpr unsigned long READ_INTERVAL_MS = 1000; // Minimum interval between two SGP41 measurements
+        static constexpr unsigned long READ_INTERVAL_MS = 950; // Minimum interval between two SGP41 measurements
 
         uint16_t lastVocIndex = 0; // Last successfully calculated VOC index
         uint16_t lastNoxIndex = 0; // Last successfully calculated NOx index

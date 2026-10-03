@@ -44,6 +44,11 @@
 #include "interface/button.hpp"
 #include "interface/buzzer.hpp"
 
+/*
+    TODO:
+            - Tester le SGP41 avec la nouvelle logique actuelle (appel au moins toutes les secondes à read())
+*/
+
 // ==================== Debug ====================
 #define DEBUG_ENABLE 1
 
@@ -146,6 +151,13 @@ bool sensorLastReadOk[SENSOR_COUNT] = {false};
 
 constexpr int MAX_CONSECUTIVE_FAILED_READS = 3;
 int sensorFailureCount[SENSOR_COUNT] = {0};
+
+// ==================== SGP41 ====================
+constexpr size_t SGP41_SENSOR_INDEX = 8; // Must match the position of VocNoxSensor in sensors[]
+static_assert(SGP41_SENSOR_INDEX < SENSOR_COUNT, "SGP41 index out of range");
+
+float cachedTemperature = NAN;
+float cachedHumidity    = NAN;
 
 // ============== Utility functions ====================
 
@@ -899,6 +911,9 @@ void handleMeasurements()
 
     dataSize          = serialize(measurement, buffer, sizeof(buffer));
     encryptedDataSize = encrypt(buffer, dataSize, deviceConfig.aesKey, encryptedBuffer, measurement.timestamp);
+
+    cachedTemperature = measurement.temperature;
+    cachedHumidity    = measurement.humidity;
 }
 
 // Handle the Bluetooth communication loop, including sending data to connected clients
@@ -939,6 +954,22 @@ void handleBluetooth()
 void handleWatchdog()
 {
     esp_task_wdt_reset();
+}
+
+// Handle the SGP41: must be called at a constant 1 s interval, because the VOC/NOx algorithms assume one sample per second.
+void handleVocNoxSensor()
+{
+    if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << SGP41_SENSOR_INDEX)))
+    {
+        sensorLastReadOk[SGP41_SENSOR_INDEX] = false;
+        return;
+    }
+
+    Measurement tempMeasurement;
+    tempMeasurement.humidity    = cachedHumidity;
+    tempMeasurement.temperature = cachedTemperature;
+
+    VocNoxSensor.read(tempMeasurement);
 }
 
 #if DEBUG_ENABLE
@@ -1072,6 +1103,10 @@ void loop()
           ||    DEBUG_ENABLE)
         {
             handleMeasurements();
+        }
+        else
+        {
+            handleVocNoxSensor();
         }
         handleBluetooth();
     }
