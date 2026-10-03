@@ -28,7 +28,7 @@ class SCD41Sensor : public Sensor
 
         unsigned long lastSuccessfulReadTime; // Timestamp of the last successfully acquired measurement
 
-        static constexpr unsigned long MAX_MEASUREMENT_AGE_MS = 30000; // Maximum age of a valid measurement (30 seconds)
+        static constexpr unsigned long MAX_MEASUREMENT_AGE_MS = 60000; // Maximum age of a valid measurement (30 seconds)
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
@@ -118,7 +118,7 @@ inline bool SCD41Sensor::begin()
     delay(1000);
 
     // Start periodic measurement mode
-    int16_t error = sensor.startPeriodicMeasurement();
+    int16_t error = sensor.startLowPowerPeriodicMeasurement();
 
     initialized = (error == 0);
 

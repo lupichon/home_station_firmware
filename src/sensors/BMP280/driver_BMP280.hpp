@@ -80,13 +80,11 @@ inline bool BMP280Sensor::begin()
 
     if (initialized)
     {
-        // Configure normal operating mode with high oversampling,
-        // strong filtering and a short standby time.
         bmp.setSampling(
             Adafruit_BMP280::MODE_NORMAL,
             Adafruit_BMP280::SAMPLING_X16,
             Adafruit_BMP280::SAMPLING_X16,
-            Adafruit_BMP280::FILTER_X16,
+            Adafruit_BMP280::FILTER_OFF,
             Adafruit_BMP280::STANDBY_MS_1
         );
     }
@@ -103,6 +101,11 @@ inline bool BMP280Sensor::read(Measurement& m)
 {
     // Do not attempt to read an uninitialized sensor
     if (!initialized)
+    {
+        return false;
+    }
+
+    if(!bmp.takeForcedMeasurement())
     {
         return false;
     }

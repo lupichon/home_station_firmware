@@ -21,7 +21,7 @@
  * The BH1750Sensor class interfaces with a BH1750 digital light sensor
  * through the I2C bus and provides the measured luminosity in lux.
  *
- * The sensor operates in continuous high-resolution mode.
+ * The sensor operates in one-time high-resolution mode.
  */
 class BH1750Sensor : public Sensor
 {
@@ -84,7 +84,7 @@ inline bool BH1750Sensor::begin()
     // Initialize the BH1750 in continuous high-resolution mode
     // using I2C address 0x23.
     initialized = sensor.begin(
-        BH1750::CONTINUOUS_HIGH_RES_MODE,
+        BH1750::ONE_TIME_HIGH_RES_MODE,
         0x23,
         &Wire
     );
@@ -99,6 +99,17 @@ inline bool BH1750Sensor::begin()
 
 inline bool BH1750Sensor::read(Measurement& m)
 {
+    if (!initialized)
+    {
+        return false;
+    }
+
+    // Trigger one measurement: the chip powers down by itself afterwards
+    if (!sensor.configure(BH1750::ONE_TIME_HIGH_RES_MODE))
+    {
+        return false;
+    }
+
     float value = sensor.readLightLevel();
 
     // A negative value indicates an invalid sensor reading
