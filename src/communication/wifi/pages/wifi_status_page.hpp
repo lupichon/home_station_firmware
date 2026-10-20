@@ -231,7 +231,7 @@ static const char WIFI_STATUS_PAGE[] PROGMEM = R"rawhtml(
 <div class="page">
 
     <h1>&#128202; System Status</h1>
-    <p class="subtitle">Full diagnostic, refreshed every 2 seconds</p>
+    <p class="subtitle">Full diagnostic, refreshed every second</p>
 
     <!-- System -->
     <div class="card">

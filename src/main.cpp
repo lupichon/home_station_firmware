@@ -44,14 +44,8 @@
 #include "interface/button.hpp"
 #include "interface/buzzer.hpp"
 
-/*
-    TODO:
-            - Tester le SGP41 avec la nouvelle logique actuelle (appel au moins toutes les secondes à read())
-            - Tester les nouveaux modes de mesure pour le SCD41, BMP280 et BH1750
-*/
-
 // ==================== Debug ====================
-#define DEBUG_ENABLE 1
+#define DEBUG_ENABLE 0
 
 // ============== Firmware Version ==============
 #ifndef FIRMWARE_VERSION_MAJOR

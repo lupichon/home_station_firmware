@@ -81,7 +81,7 @@ inline bool BMP280Sensor::begin()
     if (initialized)
     {
         bmp.setSampling(
-            Adafruit_BMP280::MODE_NORMAL,
+            Adafruit_BMP280::MODE_FORCED,
             Adafruit_BMP280::SAMPLING_X16,
             Adafruit_BMP280::SAMPLING_X16,
             Adafruit_BMP280::FILTER_OFF,
