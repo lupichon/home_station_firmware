@@ -1020,6 +1020,7 @@ void printDebugInfo()
     Serial.print("alarmArmed: ");         Serial.println(deviceConfig.alarmArmed ? "true" : "false");
     Serial.print("alarmTargetEpoch: ");   Serial.println(deviceConfig.alarmTargetEpoch);
     Serial.print("utcOffset: ");          Serial.println(deviceConfig.utcOffset);
+    Serial.print("wifiControlUUID: ");    Serial.println(deviceConfig.wifiControlUUID);
     Serial.print("enabledSensorsMask: "); Serial.println(deviceConfig.enabledSensorsMask, BIN);
     Serial.print("enabledCommsMask: ");   Serial.println(deviceConfig.enabledCommsMask, BIN);
 
