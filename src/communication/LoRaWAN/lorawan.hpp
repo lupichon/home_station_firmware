@@ -348,6 +348,7 @@ inline bool LoRaWANCommunication::checkModulePresence()
 
 inline void LoRaWANCommunication::loop()
 {
+    if (!isInitialized()) return;
     os_runloop_once();
 }
 

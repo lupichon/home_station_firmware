@@ -218,6 +218,9 @@ inline bool WiFiCommunication::begin()
 
 inline void WiFiCommunication::loop()
 {
+    if (!isInitialized() || isSleeping())
+        return;
+
     // Handle incoming HTTP requests
     server.handleClient();
 

@@ -723,7 +723,7 @@ void handleSoundSensor()
 // Handle the WiFi communication loop
 void handleWifi()
 {
-    if (wifi.isInitialized() && isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
     {
         wifi.loop();
     }
@@ -732,7 +732,7 @@ void handleWifi()
 // Handle the LoRaWAN communication loop
 void handleLoRaWAN()
 {
-    if (lorawan.isInitialized() && isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
     {
         lorawan.loop();
     }

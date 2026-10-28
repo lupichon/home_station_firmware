@@ -283,7 +283,7 @@ inline void BluetoothCommunication::onDisconnect(BLEServer* server)
 
 inline void BluetoothCommunication::onWrite(BLECharacteristic* characteristic)
 {
-    String value = String(characteristic->getValue().c_str());
+    const auto value = characteristic->getValue();
 
     if (characteristic == timeSyncCharacteristic)   // Check if the written characteristic is for time synchronization
     {
