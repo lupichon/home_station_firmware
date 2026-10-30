@@ -45,7 +45,7 @@
 #include "interface/buzzer.hpp"
 
 // ==================== Debug ====================
-#define DEBUG_ENABLE 1
+#define DEBUG_ENABLE 0
 
 // ============== Firmware Version ==============
 #ifndef FIRMWARE_VERSION_MAJOR
@@ -128,12 +128,14 @@ size_t encryptedDataSize = 0;
 constexpr unsigned long TASK_10_MS   = 10;
 constexpr unsigned long TASK_100_MS  = 100;
 constexpr unsigned long TASK_1000_MS = 1000;
+constexpr unsigned long TASK_10000_MS= 10000;
 
 unsigned long last10Ms   = 0;
 unsigned long last100Ms  = 0;
 unsigned long last1000Ms = 0;
+unsigned long last10000Ms= 0;
 
-constexpr unsigned long lorawanAutoUplinkInterval_S = 300;
+constexpr unsigned long lorawanAutoUplinkInterval_S = 600;
 
 // ==================== Counts ====================
 int sensorCount = Sensor::getSensorCount();
@@ -483,7 +485,6 @@ void setBluetoothCallbacks()
 }
 
 // Set up the callbacks for LoRaWAN communication to handle join events and transmission completion
-void handleMeasurements();
 void setLoRaWANCallbacks()
 {
     lorawan.onJoining([]()
@@ -641,6 +642,8 @@ void initCommunication()
                           deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey, 
                           [](uint8_t* buf, uint8_t maxLen) -> uint8_t
                           {
+                            if (accumulator.empty()) return 0;
+
                             Measurement avg = accumulator.average();
                             size_t len = serialize(avg, buf, maxLen);
                             accumulator.reset();
@@ -849,7 +852,6 @@ void handleMeasurements()
     clearMeasurement(measurement);
 
     bool success = true;
-    measurement.timestamp = systemClock.now();
     for(int i = 0; i < SENSOR_COUNT; i++)
     {
         if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i)))
@@ -898,10 +900,10 @@ void handleMeasurements()
             }
         }
     }
-    
-    status.sensorOK = success;
+    measurement.timestamp = systemClock.now();
+    measurement.acquiredMs = millis();
 
-    accumulator.add(measurement);
+    status.sensorOK = success;
 
     dataSize          = serialize(measurement, buffer, sizeof(buffer));
     encryptedDataSize = encrypt(buffer, dataSize, deviceConfig.aesKey, encryptedBuffer, measurement.timestamp);
@@ -1104,5 +1106,20 @@ void loop()
             handleVocNoxSensor();
         }
         handleBluetooth();
+    }
+
+    // Task executed every 30000 ms: accumulate measurements for the LoRaWAN uplink
+    if (now - last10000Ms >= TASK_10000_MS)
+    {
+        last10000Ms = now;
+
+        if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+        {
+            if (now - measurement.acquiredMs > 1500)
+            {
+                handleMeasurements();
+            }
+            accumulator.add(measurement);
+        }
     }
 }

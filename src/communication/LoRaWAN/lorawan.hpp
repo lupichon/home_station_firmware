@@ -133,7 +133,8 @@ class LoRaWANCommunication : public Communication
         void onLinkDead     (LinkDeadCallback     cb) { linkDeadCb      = cb; } // Callback for when the LoRaWAN link is considered dead (no downlink received for a while)
         void onLinkAlive    (LinkAliveCallback    cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
         void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
-        void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join         void onTxStart      (TxStartCallback      cb) { txStartCb       = cb; } // Callback for when a transmission starts
+        void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join
+        void onTxStart      (TxStartCallback      cb) { txStartCb       = cb; } // Callback for when a transmission starts
 
     private:
         uint8_t nssPin;     // SPI Chip Select pin for the LoRa module

@@ -23,6 +23,7 @@
 struct Measurement
 {
     uint32_t timestamp = 0;         // Epoch time at which the measurement was taken
+    uint32_t acquiredMs = 0;        // millis() at acquisition, used to measure the age of the reading
 
     float temperature  = NAN;       // Temperature reading (°C)
     float humidity     = NAN;       // Relative humidity reading (%)
@@ -96,6 +97,14 @@ struct MeasurementAccumulator
         vibration |= m.vibration;
     }
 
+    bool empty() const
+    {
+        return temperature.count == 0 && humidity.count == 0 &&
+               luminosity.count  == 0 && pressure.count == 0 &&
+               co2.count == 0 && gasRaw.count == 0 &&
+               vocIndex.count == 0 && noxIndex.count == 0;
+    }
+
     Measurement average() const
     {
         Measurement m;
@@ -145,6 +154,7 @@ struct MeasurementStatus
 inline void clearMeasurement(Measurement& measurement)
 {
     measurement.timestamp   = 0;
+    measurement.acquiredMs  = 0;
     measurement.temperature = NAN;
     measurement.humidity    = NAN;
     measurement.co2         = 0;
