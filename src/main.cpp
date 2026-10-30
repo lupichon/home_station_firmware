@@ -45,7 +45,7 @@
 #include "interface/buzzer.hpp"
 
 // ==================== Debug ====================
-#define DEBUG_ENABLE 0
+#define DEBUG_ENABLE 1
 
 // ============== Firmware Version ==============
 #ifndef FIRMWARE_VERSION_MAJOR
@@ -114,6 +114,7 @@ Sensor* sensors[] =
 
 // ==================== Data ====================
 Measurement     measurement;
+MeasurementAccumulator accumulator;
 Status          status;
 DeviceConfig    deviceConfig;
 
@@ -485,11 +486,6 @@ void setBluetoothCallbacks()
 void handleMeasurements();
 void setLoRaWANCallbacks()
 {
-    lorawan.onBeforeUplink([]()
-    {
-        handleMeasurements();
-    });
-
     lorawan.onJoining([]()
     {
         #if DEBUG_ENABLE
@@ -645,9 +641,10 @@ void initCommunication()
                           deviceConfig.devEui, deviceConfig.appEui, deviceConfig.appKey, 
                           [](uint8_t* buf, uint8_t maxLen) -> uint8_t
                           {
-                              uint8_t len = (dataSize < maxLen) ? static_cast<uint8_t>(dataSize) : maxLen;
-                              memcpy(buf, buffer, len);
-                              return len;
+                            Measurement avg = accumulator.average();
+                            size_t len = serialize(avg, buf, maxLen);
+                            accumulator.reset();
+                            return static_cast<uint8_t>(len);
                           },
                           lorawanAutoUplinkInterval_S);
         setLoRaWANCallbacks(); 
@@ -903,6 +900,8 @@ void handleMeasurements()
     }
     
     status.sensorOK = success;
+
+    accumulator.add(measurement);
 
     dataSize          = serialize(measurement, buffer, sizeof(buffer));
     encryptedDataSize = encrypt(buffer, dataSize, deviceConfig.aesKey, encryptedBuffer, measurement.timestamp);

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <math.h>
+#include <stdint.h>
 
 // ============================================================
 // Measurement struct definition
@@ -36,6 +37,85 @@ struct Measurement
     bool sound         = false;     // Whether sound was detected
     bool obstacle      = false;     // Whether an obstacle was detected
     bool vibration     = false;     // Whether vibration was detected
+};
+
+// ============================================================
+// Measurement accumulator
+// ============================================================
+
+/**
+ * @brief Running sum and sample count for one numeric field.
+ */
+struct RunningAverage
+{
+    float    sum   = 0.0f;
+    uint32_t count = 0;
+
+    void add(float value)
+    {
+        if (isnan(value)) return;
+        sum += value;
+        count++;
+    }
+
+    float get() const { return count ? sum / count : NAN; }
+    void  reset()     { sum = 0.0f; count = 0; }
+};
+
+/**
+ * @brief Accumulates Measurements between two transmissions and produces
+ *        their average. Booleans are OR-ed (event seen at least once).
+ *        Integer fields equal to 0 are treated as "no reading" and skipped.
+ */
+struct MeasurementAccumulator
+{
+    uint32_t lastTimestamp = 0;
+
+    RunningAverage temperature, humidity, luminosity, pressure;
+    RunningAverage co2, gasRaw, vocIndex, noxIndex;
+
+    bool motion = false, sound = false, obstacle = false, vibration = false;
+
+    void add(const Measurement& m)
+    {
+        lastTimestamp = m.timestamp;
+
+        temperature.add(m.temperature);
+        humidity.add(m.humidity);
+        luminosity.add(m.luminosity);
+        pressure.add(m.pressure);
+
+        co2.add(m.co2);
+        gasRaw.add(m.gasRaw);
+        vocIndex.add(m.vocIndex);
+        noxIndex.add(m.noxIndex);
+
+        motion    |= m.motion;
+        sound     |= m.sound;
+        obstacle  |= m.obstacle;
+        vibration |= m.vibration;
+    }
+
+    Measurement average() const
+    {
+        Measurement m;
+        m.timestamp   = lastTimestamp;
+        m.temperature = temperature.get();
+        m.humidity    = humidity.get();
+        m.luminosity  = luminosity.get();
+        m.pressure    = pressure.get();
+        m.co2         = co2.count      ? (uint16_t)lroundf(co2.get())      : 0;
+        m.gasRaw      = gasRaw.count   ? (uint16_t)lroundf(gasRaw.get())   : 0;
+        m.vocIndex    = vocIndex.count ? (uint16_t)lroundf(vocIndex.get()) : 0;
+        m.noxIndex    = noxIndex.count ? (uint16_t)lroundf(noxIndex.get()) : 0;
+        m.motion      = motion;
+        m.sound       = sound;
+        m.obstacle    = obstacle;
+        m.vibration   = vibration;
+        return m;
+    }
+
+    void reset() { *this = MeasurementAccumulator(); }
 };
 
 // ============================================================
