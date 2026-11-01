@@ -60,6 +60,8 @@ struct RunningAverage
     }
 
     float get() const { return count ? sum / count : NAN; }
+    uint32_t getCount() const { return count; }
+    float getSum() const { return sum; }
     void  reset()     { sum = 0.0f; count = 0; }
 };
 
@@ -71,6 +73,7 @@ struct RunningAverage
 struct MeasurementAccumulator
 {
     uint32_t lastTimestamp = 0;
+    uint32_t lastAcquiredMs = 0;  
 
     RunningAverage temperature, humidity, luminosity, pressure;
     RunningAverage co2, gasRaw, vocIndex, noxIndex;
@@ -80,6 +83,7 @@ struct MeasurementAccumulator
     void add(const Measurement& m)
     {
         lastTimestamp = m.timestamp;
+        lastAcquiredMs = m.acquiredMs;
 
         temperature.add(m.temperature);
         humidity.add(m.humidity);
@@ -108,7 +112,8 @@ struct MeasurementAccumulator
     Measurement average() const
     {
         Measurement m;
-        m.timestamp   = lastTimestamp;
+        m.timestamp   = lastTimestamp;  
+        m.acquiredMs  = lastAcquiredMs;
         m.temperature = temperature.get();
         m.humidity    = humidity.get();
         m.luminosity  = luminosity.get();
@@ -125,6 +130,22 @@ struct MeasurementAccumulator
     }
 
     void reset() { *this = MeasurementAccumulator(); }
+
+    void printDebugInfo() const
+    {   
+        Serial.print("Temperature: ");  Serial.print("Count: "); Serial.print(temperature.getCount());  Serial.print(" Sum: "); Serial.print(temperature.getSum()); Serial.print(" Mean: "); Serial.println(temperature.get());
+        Serial.print("Humidity: ");     Serial.print("Count: "); Serial.print(humidity.getCount());     Serial.print(" Sum: "); Serial.print(humidity.getSum());    Serial.print(" Mean: "); Serial.println(humidity.get());
+        Serial.print("Luminosity: ");   Serial.print("Count: "); Serial.print(luminosity.getCount());   Serial.print(" Sum: "); Serial.print(luminosity.getSum());  Serial.print(" Mean: "); Serial.println(luminosity.get());
+        Serial.print("Pressure: ");     Serial.print("Count: "); Serial.print(pressure.getCount());     Serial.print(" Sum: "); Serial.print(pressure.getSum());    Serial.print(" Mean: "); Serial.println(pressure.get());
+        Serial.print("CO2: ");          Serial.print("Count: "); Serial.print(co2.getCount());          Serial.print(" Sum: "); Serial.print(co2.getSum());         Serial.print(" Mean: "); Serial.println(co2.get());
+        Serial.print("Gas Raw: ");      Serial.print("Count: "); Serial.print(gasRaw.getCount());       Serial.print(" Sum: "); Serial.print(gasRaw.getSum());      Serial.print(" Mean: "); Serial.println(gasRaw.get());
+        Serial.print("VOC Index: ");    Serial.print("Count: "); Serial.print(vocIndex.getCount());     Serial.print(" Sum: "); Serial.print(vocIndex.getSum());    Serial.print(" Mean: "); Serial.println(vocIndex.get());
+        Serial.print("NOx Index: ");    Serial.print("Count: "); Serial.print(noxIndex.getCount());     Serial.print(" Sum: "); Serial.print(noxIndex.getSum());    Serial.print(" Mean: "); Serial.println(noxIndex.get());
+        Serial.print("Motion: ");       Serial.println(motion);
+        Serial.print("Sound: ");        Serial.println(sound);
+        Serial.print("Obstacle: ");     Serial.println(obstacle);
+        Serial.print("Vibration: ");    Serial.println(vibration);
+    }
 };
 
 // ============================================================

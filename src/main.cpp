@@ -128,12 +128,12 @@ size_t encryptedDataSize = 0;
 constexpr unsigned long TASK_10_MS   = 10;
 constexpr unsigned long TASK_100_MS  = 100;
 constexpr unsigned long TASK_1000_MS = 1000;
-constexpr unsigned long TASK_10000_MS= 10000;
+constexpr unsigned long TASK_60000_MS= 60000;
 
 unsigned long last10Ms   = 0;
 unsigned long last100Ms  = 0;
 unsigned long last1000Ms = 0;
-unsigned long last10000Ms= 0;
+unsigned long last60000Ms= 0;
 
 constexpr unsigned long lorawanAutoUplinkInterval_S = 600;
 
@@ -533,6 +533,19 @@ void setLoRaWANCallbacks()
         #endif
     });
 
+    lorawan.onAutoUplinkResult([](bool acked)
+    {
+        // Keep the accumulated data until the network acknowledged it
+        if (acked)
+        {
+            accumulator.reset();
+        }
+
+        #if DEBUG_ENABLE
+        Serial.println(acked ? "LoRaWAN : uplink acknowledged." : "LoRaWAN : uplink not acknowledged, will retry.");
+        #endif
+    });
+
     lorawan.onDownlink([](uint8_t port, const uint8_t* data, uint8_t length)
     {
         #if DEBUG_ENABLE
@@ -646,7 +659,6 @@ void initCommunication()
 
                             Measurement avg = accumulator.average();
                             size_t len = serialize(avg, buf, maxLen);
-                            accumulator.reset();
                             return static_cast<uint8_t>(len);
                           },
                           lorawanAutoUplinkInterval_S);
@@ -912,6 +924,16 @@ void handleMeasurements()
     cachedHumidity    = measurement.humidity;
 }
 
+// Handle the accumulation of measurements for later processing
+void handleAccumulator()
+{
+    accumulator.add(measurement);
+
+    #if DEBUG_ENABLE
+    accumulator.printDebugInfo();
+    #endif
+}
+
 // Handle the Bluetooth communication loop, including sending data to connected clients
 void handleBluetooth()
 {
@@ -1108,10 +1130,10 @@ void loop()
         handleBluetooth();
     }
 
-    // Task executed every 30000 ms: accumulate measurements for the LoRaWAN uplink
-    if (now - last10000Ms >= TASK_10000_MS)
+    // Task executed every 10000 ms: accumulate measurements for the LoRaWAN uplink
+    if (now - last60000Ms >= TASK_60000_MS)
     {
-        last10000Ms = now;
+        last60000Ms = now;
 
         if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
         {
@@ -1119,7 +1141,7 @@ void loop()
             {
                 handleMeasurements();
             }
-            accumulator.add(measurement);
+            handleAccumulator();
         }
     }
 }

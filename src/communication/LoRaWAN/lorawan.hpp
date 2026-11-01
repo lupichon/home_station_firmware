@@ -45,6 +45,7 @@ class LoRaWANCommunication : public Communication
         using JoiningCallback       = void (*)();
         using BeforeUplinkCallback  = void (*)();
         using TxStartCallback       = void (*)();
+        using AutoUplinkResultCallback = void (*)(bool acked);
 
         /**
          * @brief Constructor for LoRaWANCommunication.
@@ -135,6 +136,7 @@ class LoRaWANCommunication : public Communication
         void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
         void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join
         void onTxStart      (TxStartCallback      cb) { txStartCb       = cb; } // Callback for when a transmission starts
+        void onAutoUplinkResult(AutoUplinkResultCallback cb) { autoUplinkResultCb = cb; } // Callback with the ACK status of each automatic (confirmed) uplink
 
     private:
         uint8_t nssPin;     // SPI Chip Select pin for the LoRa module
@@ -164,10 +166,16 @@ class LoRaWANCommunication : public Communication
         JoiningCallback      joiningCb       = nullptr;
         LinkAliveCallback    linkAliveCb     = nullptr;
         TxStartCallback       txStartCb      = nullptr;
+        AutoUplinkResultCallback autoUplinkResultCb = nullptr;
 
         osjob_t sendjob;    // Job structure for scheduling automatic uplink transmissions
 
-        static constexpr uint8_t MAX_PAYLOAD_LEN = 51;  // Maximum payload length for LoRaWAN 
+        bool    autoSendInFlight = false;  // True while a confirmed automatic uplink awaits its TX complete event
+        uint8_t retryCount       = 0;      // Consecutive automatic uplinks that were not acknowledged
+
+        static constexpr uint8_t  MAX_PAYLOAD_LEN = 51;  // Maximum payload length for LoRaWAN 
+        static constexpr uint8_t  MAX_SEND_RETRIES = 3;  // Retries after an unacknowledged automatic uplink before going back to the normal interval
+        static constexpr uint32_t RETRY_DELAY_S    = 60; // Delay in seconds between two retries
 
         /**
          * @brief Read a register from the LoRa module
@@ -192,6 +200,12 @@ class LoRaWANCommunication : public Communication
          * @param job The job structure
          */
         static void doSendRelay(osjob_t* job);
+
+        /**
+         * @brief Schedule the next automatic uplink.
+         * @param delayS Delay in seconds before the next attempt.
+         */
+        void scheduleNextSend(uint32_t delayS);
 
         // Friend functions to allow LMIC library to access private members of this class
         friend void os_getDevEui(u1_t* buf);
@@ -382,10 +396,22 @@ inline bool LoRaWANCommunication::send(uint8_t* data, size_t size)
     return sendUplink(data, static_cast<uint8_t>(size), 1, false);
 }
 
+inline void LoRaWANCommunication::scheduleNextSend(uint32_t delayS)
+{
+    os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(delayS), doSendRelay);
+}
+
 inline void LoRaWANCommunication::handleAutoSend()
 {
-    if (!payloadBuilder || isTxPending())
+    if (!payloadBuilder)
     {
+        return;
+    }
+
+    // Without a transmission there is no TX complete event, so the next attempt must be scheduled here
+    if (isTxPending())
+    {
+        scheduleNextSend(RETRY_DELAY_S);
         return;
     }
 
@@ -394,10 +420,12 @@ inline void LoRaWANCommunication::handleAutoSend()
 
     if (length == 0)
     {
+        scheduleNextSend(autoUplinkInterval);
         return;
     }
 
-    LMIC_setTxData2(1, buffer, length, 0);
+    autoSendInFlight = true;
+    LMIC_setTxData2(1, buffer, length, 1);
 }
 
 inline void LoRaWANCommunication::doSendRelay(osjob_t* job)
@@ -446,13 +474,28 @@ inline void LoRaWANCommunication::handleEvent(ev_t event)
                 downlinkCb(port, LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
             }
             if (txCompleteCb) txCompleteCb(LMIC.dataLen > 0);
-            if (payloadBuilder)
+
+            if (autoSendInFlight)
             {
-                os_setTimedCallback(
-                    &sendjob,
-                    os_getTime() + sec2osticks(autoUplinkInterval),
-                    doSendRelay
-                );
+                autoSendInFlight = false;
+                bool acked = (LMIC.txrxFlags & TXRX_ACK) != 0;
+
+                if (autoUplinkResultCb) autoUplinkResultCb(acked);
+
+                if (!acked && retryCount < MAX_SEND_RETRIES)
+                {
+                    retryCount++;
+                    scheduleNextSend(RETRY_DELAY_S);
+                }
+                else
+                {
+                    retryCount = 0;
+                    scheduleNextSend(autoUplinkInterval);
+                }
+            }
+            else if (payloadBuilder)
+            {
+                scheduleNextSend(autoUplinkInterval);
             }
             break;
 

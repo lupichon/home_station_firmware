@@ -30,7 +30,7 @@ class MAX9814Sensor : public Sensor
 
         static constexpr unsigned long WINDOW_MS = 60; // Duration of the sound sampling window in milliseconds
 
-        static constexpr int THRESHOLD = 500; // Minimum signal amplitude required to trigger sound detection
+        static constexpr int THRESHOLD = 200; // Minimum signal amplitude required to trigger sound detection
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
