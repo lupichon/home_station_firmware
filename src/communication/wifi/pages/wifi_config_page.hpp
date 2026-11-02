@@ -236,6 +236,19 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             <p class="hint">Integer value between -12 and +14. Example: 2 for UTC+2.</p>
         </div>
 
+        <div class="field">
+            <label for="altitudeM">Altitude (m)</label>
+            <input
+                type="number"
+                id="altitudeM"
+                name="altitudeM"
+                min="-500"
+                max="9000"
+                step="1"
+            >
+            <p class="hint">Altitude above sea level in meters (-500 to 9000). Used to convert the BMP280 pressure to sea-level pressure.</p>
+        </div>
+
     </div>
 
 
@@ -569,6 +582,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             .then(r => { if (!r.ok) throw new Error(); return r.json(); })
             .then(config => {
                 setValue('utcOffset',         config.utcOffset ?? 0);
+                setValue('altitudeM',         config.altitudeM ?? 0);
                 setValue('devEui',            config.devEui);
                 setValue('appEui',            config.appEui);
                 setValue('appKey',            config.appKey);
@@ -597,6 +611,13 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             return false;
         }
         markInvalid('utcOffset', false);
+
+        if (isNaN(config.altitudeM) || config.altitudeM < -500 || config.altitudeM > 9000) {
+            markInvalid('altitudeM', true);
+            showAlert('Invalid altitude. Must be between -500 and 9000 m.', 'error');
+            return false;
+        }
+        markInvalid('altitudeM', false);
 
         if (!isHex(config.devEui, 16)) {
             markInvalid('devEui', true);
@@ -670,6 +691,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
 
         const config = {
             utcOffset:          parseInt(document.getElementById('utcOffset').value),
+            altitudeM:          parseInt(document.getElementById('altitudeM').value),
             devEui:             document.getElementById('devEui').value.trim(),
             appEui:             document.getElementById('appEui').value.trim(),
             appKey:             document.getElementById('appKey').value.trim(),
@@ -772,6 +794,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
             .then(r => { if (!r.ok) throw new Error(); return r.json(); })
             .then(config => {
                 setValue('utcOffset',          config.utcOffset ?? 0);
+                setValue('altitudeM',          config.altitudeM ?? 0);
                 setValue('devEui',             config.devEui);
                 setValue('appEui',             config.appEui);
                 setValue('appKey',             config.appKey);
@@ -824,6 +847,7 @@ static const char WIFI_CONFIG_PAGE[] PROGMEM = R"rawhtml(
                 const config = JSON.parse(e.target.result);
 
                 setValue('utcOffset',          config.utcOffset ?? 0);
+                setValue('altitudeM',          config.altitudeM ?? 0);
                 setValue('devEui',             config.devEui);
                 setValue('appEui',             config.appEui);
                 setValue('appKey',             config.appKey);

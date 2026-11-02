@@ -286,6 +286,12 @@ void setWifiCallbacks()
             deviceConfig.utcOffset = newDeviceConfig.utcOffset;
         }
 
+        if (newDeviceConfig.altitudeM != deviceConfig.altitudeM)
+        {
+            storage.putShort(Storage::altitudeKey, newDeviceConfig.altitudeM);
+            deviceConfig.altitudeM = newDeviceConfig.altitudeM;
+        }
+
         if (newDeviceConfig.enabledSensorsMask != deviceConfig.enabledSensorsMask)
         {
             storage.putUInt(Storage::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
@@ -611,6 +617,7 @@ void initStorage()
     deviceConfig.alarmArmed         = storage.getBool(Storage::alarmArmedKey,  false);
     deviceConfig.alarmTargetEpoch   = storage.getUInt(Storage::alarmTargetKey, 0);
     deviceConfig.utcOffset          = storage.getChar(Storage::utcOffsetKey,   0);
+    deviceConfig.altitudeM          = storage.getShort(Storage::altitudeKey,   0);
     deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(Storage::enabledSensorsMaskKey, 0xFFFF));
     deviceConfig.enabledCommsMask   = static_cast<uint8_t>(storage.getUInt(Storage::enabledCommsMaskKey, 0x07));
 
@@ -677,6 +684,8 @@ void initCommunication()
 // Initialize all sensors based on the enabled sensors mask in the device configuration
 void initSensors()
 {
+    pressureSensor.setAltitude(deviceConfig.altitudeM);
+
     for(int i = 0; i < SENSOR_COUNT; i++)
     {
         if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i))) continue; 

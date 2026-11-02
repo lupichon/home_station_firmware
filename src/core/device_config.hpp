@@ -50,6 +50,9 @@ struct DeviceConfig
     // ── Communication ────────────────────────────────────────────────────
     uint8_t enabledCommsMask = 0x07; // Bitmask of enabled communication interfaces (bit 0: LoRaWAN, bit 1: Bluetooth, bit 2: WiFi AP)
 
+    // ── Location ─────────────────────────────────────────────────────────
+    int16_t altitudeM = 0;   // Altitude in meters, used to convert pressure to sea level
+
     // ── Crypto ─────────────────────────────────────────────────────────────
     uint8_t aesKey[16];   // AES-128 key for encrypting/decrypting data
 };

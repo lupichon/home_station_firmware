@@ -267,6 +267,9 @@ inline void WiFiCommunication::handleGetConfig()
     json += "\"utcOffset\":";
     json += String((int)deviceConfig->utcOffset);
 
+    json += ",\"altitudeM\":";
+    json += String((int)deviceConfig->altitudeM);
+
     json += ",\"enabledSensorsMask\":";
     json += String(deviceConfig->enabledSensorsMask);
 
@@ -353,6 +356,7 @@ inline void WiFiCommunication::handlePostConfig()
 
     // Extract configuration parameters from the JSON document with default values
     int8_t utcOffset               = doc["utcOffset"] | -128; 
+    int altitudeM                  = doc["altitudeM"]          | 0;
     uint16_t enabledSensorsMask    = doc["enabledSensorsMask"] | 0xFFFF;
     uint8_t enabledCommsMask       = doc["enabledCommsMask"]   | 0x07;
     String devEui                  = doc["devEui"]             | "";
@@ -372,6 +376,12 @@ inline void WiFiCommunication::handlePostConfig()
     if (utcOffset < -12 || utcOffset > 14)
     {
         server.send(400, "application/json", "{\"ok\":false,\"error\":\"utcOffset out of range\"}");
+        return;
+    }
+
+    if (altitudeM < -500 || altitudeM > 9000)
+    {
+        server.send(400, "application/json", "{\"ok\":false,\"error\":\"altitudeM out of range\"}");
         return;
     }
 
@@ -428,6 +438,7 @@ inline void WiFiCommunication::handlePostConfig()
     DeviceConfig newDeviceConfig = *deviceConfig; 
 
     newDeviceConfig.utcOffset          = utcOffset;
+    newDeviceConfig.altitudeM          = static_cast<int16_t>(altitudeM);
     newDeviceConfig.bleDeviceName      = bleDeviceName;
     newDeviceConfig.serviceUUID        = serviceUUID;
     newDeviceConfig.characteristicUUID = characteristicUUID;

@@ -12,6 +12,15 @@
 #include <Adafruit_BMP280.h>
 #include "../sensor.hpp"
 
+// Pressure measurement modes for BMP280 sensor
+#define PRESSURE_RAW 1          // Use raw atmospheric pressure without sea-level correction
+#define PRESSURE_SEA_LEVEL 2    // Correct pressure to sea level using station altitude
+
+#define PRESSURE_DEFAULT PRESSURE_SEA_LEVEL
+
+#if PRESSURE_DEFAULT != PRESSURE_RAW && PRESSURE_DEFAULT != PRESSURE_SEA_LEVEL
+#error "Unsupported PRESSURE_DEFAULT value"
+#endif
 
 // ============================================================
 // BMP280Sensor class definition
@@ -22,6 +31,7 @@ class BMP280Sensor : public Sensor
     // ── Private members ───────────────────────────────────────────────────
     private:
         Adafruit_BMP280 bmp;  // BMP280 sensor driver instance
+        float altitudeM = 0.0f;  // Station altitude in meters, used for sea-level pressure
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
@@ -37,6 +47,12 @@ class BMP280Sensor : public Sensor
          *         false otherwise.
          */
         bool begin() override;
+
+        /**
+         * @brief Set the station altitude used to convert the pressure to sea level.
+         * @param meters Altitude above sea level in meters.
+         */
+        void setAltitude(float meters);
 
         /**
          * @brief Read the current atmospheric pressure.
@@ -92,6 +108,14 @@ inline bool BMP280Sensor::begin()
     return initialized;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Setter
+// ─────────────────────────────────────────────────────────────────────────────
+
+inline void BMP280Sensor::setAltitude(float meters)
+{
+    altitudeM = meters;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Measurement Reading
@@ -110,8 +134,16 @@ inline bool BMP280Sensor::read(Measurement& m)
         return false;
     }
 
-    // Convert pressure from Pa to hPa
-    m.pressure = bmp.readPressure() / 100.0f;
+    // Convert pressure from Pa to hPa, then reduce it to sea level
+    float stationHpa = bmp.readPressure() / 100.0f;
+
+    #if PRESSURE_DEFAULT == PRESSURE_RAW
+    m.pressure = stationHpa;
+    #endif
+
+    #if PRESSURE_DEFAULT == PRESSURE_SEA_LEVEL
+    m.pressure = stationHpa / powf(1.0f - altitudeM / 44330.0f, 5.255f);
+    #endif
 
     return true;
 }

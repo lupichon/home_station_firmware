@@ -104,6 +104,22 @@ class Storage
         String getString(const char* key, const String& defaultValue = "");
 
         /**
+         * @brief Store a signed 16-bit integer.
+         * @param key   Key under which the value is stored.
+         * @param value Value to store.
+         * @return true if the value was stored successfully, false otherwise.
+         */
+        bool putShort(const char* key, int16_t value);
+
+        /**
+         * @brief Retrieve a signed 16-bit integer.
+         * @param key          Key to read.
+         * @param defaultValue Value returned if the key does not exist.
+         * @return The stored value, or defaultValue if the key is absent.
+         */
+        int16_t getShort(const char* key, int16_t defaultValue = 0);
+
+        /**
          * @brief Store a signed 8-bit integer.
          * @param key   Key under which the value is stored.
          * @param value Value to store.
@@ -163,6 +179,7 @@ class Storage
         static constexpr const char* enabledCommsMaskKey    = "enCommMask";
         static constexpr const char* wifiControlUUIDKey     = "wiCoUUID";
         static constexpr const char* aesKeyKey              = "aesKey";
+        static constexpr const char* altitudeKey            = "altitude";
         
     // ── Private members ───────────────────────────────────────────────────
     private:
@@ -262,6 +279,16 @@ inline String Storage::getString(const char* key, const String& defaultValue)
 // ─────────────────────────────────────────────────────────────────────────────
 // Signed Integer Storage
 // ─────────────────────────────────────────────────────────────────────────────
+
+inline bool Storage::putShort(const char* key, int16_t value)
+{
+    return preferences.putShort(key, value) > 0;
+}
+
+inline int16_t Storage::getShort(const char* key, int16_t defaultValue)
+{
+    return preferences.getShort(key, defaultValue);
+}
 
 inline bool Storage::putChar(const char* key, int8_t value)
 {
