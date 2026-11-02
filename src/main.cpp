@@ -1,5 +1,5 @@
 /**
- * @file    home_station_firmware.ino
+ * @file    main.cpp
  * @brief   Main firmware file for the HomeStation device.
  * @author  Lucas Pichon
  * @date    2026-07-16

@@ -53,7 +53,7 @@ inline size_t serialize(const Measurement& measurement, uint8_t* buffer, size_t 
     memcpy(buffer + offset, &measurement.noxIndex, sizeof(uint16_t)); offset += sizeof(uint16_t);
     memcpy(buffer + offset, &measurement.gasRaw,   sizeof(uint16_t)); offset += sizeof(uint16_t);
 
-    // Flag byte: bits 0-3 = binary sensors, bits 4-5 = gas state
+    // Flag byte: bits 0-3 = binary sensors
     uint8_t flags = 0;
     flags |= (measurement.motion    ? 1 : 0) << 0;
     flags |= (measurement.sound     ? 1 : 0) << 1;
