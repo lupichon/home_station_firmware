@@ -208,6 +208,7 @@ inline bool WiFiCommunication::begin()
 
     initialized = true;
     sleep = false;
+    lastClientSeenMillis = millis(); // start the inactivity timer even if no client ever connects
     return true;
 }
 
@@ -228,7 +229,7 @@ inline void WiFiCommunication::loop()
     {
         lastClientSeenMillis = millis();
     }
-    else if (lastClientSeenMillis > 0 && millis() - lastClientSeenMillis > WIFI_TIMEOUT_MS)
+    else if (millis() - lastClientSeenMillis > WIFI_TIMEOUT_MS)
     {
         stop();
     }
