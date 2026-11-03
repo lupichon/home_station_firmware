@@ -159,6 +159,7 @@ float cachedHumidity    = NAN;
 
 // ============== Utility functions ====================
 
+// Get a human-readable string representing the reason for the last reset of the ESP device
 String getResetReasonString()
 {
     switch (esp_reset_reason())
@@ -175,6 +176,40 @@ String getResetReasonString()
         case ESP_RST_SDIO:      return "SDIO reset";
         default:                return "Unknown";
     }
+}
+
+// Check if LoRaWAN communication is enabled
+bool isLoRaWANEnabled()
+{
+    return isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT);
+}
+
+// Check if Bluetooth communication is enabled
+bool isBluetoothEnabled()
+{
+    return isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT);
+}
+
+// Check if WiFi communication is enabled
+bool isWiFiEnabled()
+{
+    return isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT);
+}
+
+// Check if the last measurement is stale based on the current time
+bool isMeasurementStale(unsigned long now)
+{
+    constexpr unsigned long MEASUREMENT_MAX_AGE_MS = 1500; // 1.5 seconds
+    return (now - measurement.acquiredMs) > MEASUREMENT_MAX_AGE_MS;
+}
+
+// Check if live data is requested from any communication interface or the screen is active
+bool isLiveDataRequested()
+{
+    return (isBluetoothEnabled() && bluetooth.hasConnectedClient()) 
+        || (isWiFiEnabled()      && wifi.hasConnectedClient())
+        || !screen.isSleeping()
+        || DEBUG_ENABLE;
 }
 
 // =================== Callback Setup Functions ====================
@@ -420,19 +455,19 @@ void setWifiCallbacks()
         json += "\"comms\":{";
 
         json += "\"wifi\":{";
-        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) ? 1 : 0) + ",";
+        json += "\"enabled\":" + String(isWiFiEnabled() ? 1 : 0) + ",";
         json += "\"clients\":" + String(WiFi.softAPgetStationNum());
         json += "},";
 
         json += "\"bluetooth\":{";
-        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT) ? 1 : 0) + ",";
+        json += "\"enabled\":" + String(isBluetoothEnabled() ? 1 : 0) + ",";
         json += "\"initialized\":" + String(bluetooth.isInitialized() ? 1 : 0) + ",";
         json += "\"connected\":" + String(bluetooth.hasConnectedClient() ? 1 : 0) + ",";
         json += "\"lastOK\":" + String(status.bluetoothOK ? 1 : 0);
         json += "},";
 
         json += "\"lorawan\":{";
-        json += "\"enabled\":" + String(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT) ? 1 : 0) + ",";
+        json += "\"enabled\":" + String(isLoRaWANEnabled() ? 1 : 0) + ",";
         json += "\"initialized\":" + String(lorawan.isInitialized() ? 1 : 0) + ",";
         json += "\"joined\":" + String(lorawan.isJoined() ? 1 : 0) + ",";
         json += "\"lastOK\":" + String(status.lorawanOK ? 1 : 0);
@@ -470,7 +505,7 @@ void setBluetoothCallbacks()
     {
         if (enable)
         {
-            if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+            if (isWiFiEnabled())
             {
                 wifi.begin();
 
@@ -643,7 +678,7 @@ void initCommunication()
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     SPI .begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SPI_NSS_PIN);
 
-    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT))
+    if (isBluetoothEnabled())
     {   
         bluetooth.configure(deviceConfig.bleDeviceName, 
                             deviceConfig.serviceUUID, 
@@ -655,7 +690,7 @@ void initCommunication()
         bluetooth.begin();
     }
 
-    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+    if (isLoRaWANEnabled())
     {
         lorawanPtr = &lorawan; // Pointer to the LoRaWANCommunication instance for LMIC callbacks
         lorawan.configure(SPI_NSS_PIN, SX1276_RST_PIN, SX1276_DIO0_PIN, SX1276_DIO1_PIN, 
@@ -673,7 +708,7 @@ void initCommunication()
         lorawan.begin();
     }
 
-    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    if (isWiFiEnabled())
     {
         wifi.configure(deviceConfig.wifiApSSID, deviceConfig.wifiApPassword);
         setWifiCallbacks();
@@ -744,7 +779,7 @@ void handleSoundSensor()
 // Handle the WiFi communication loop
 void handleWifi()
 {
-    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT))
+    if (isWiFiEnabled())
     {
         wifi.loop();
     }
@@ -753,7 +788,7 @@ void handleWifi()
 // Handle the LoRaWAN communication loop
 void handleLoRaWAN()
 {
-    if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+    if (isLoRaWANEnabled())
     {
         lorawan.loop();
     }
@@ -764,11 +799,8 @@ void handleLED()
 {
     statusLED.update();
 
-    status.lorawanOK = !isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT)
-                       || (lorawan.isInitialized() && lorawan.isJoined());
-
-    status.wifiOK = !isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT)
-                    || wifi.isInitialized();
+    status.lorawanOK = !isLoRaWANEnabled() || (lorawan.isInitialized() && lorawan.isJoined());
+    status.wifiOK = !isWiFiEnabled() || wifi.isInitialized();
 
     if (!status.sensorOK && !status.lorawanOK)
     {
@@ -946,7 +978,7 @@ void handleAccumulator()
 // Handle the Bluetooth communication loop, including sending data to connected clients
 void handleBluetooth()
 {
-    if (!isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT))
+    if (!isBluetoothEnabled())
     {
         status.bluetoothOK = true;
         return;
@@ -1055,6 +1087,7 @@ void printDebugInfo()
     Serial.print("wifiControlUUID: ");    Serial.println(deviceConfig.wifiControlUUID);
     Serial.print("enabledSensorsMask: "); Serial.println(deviceConfig.enabledSensorsMask, BIN);
     Serial.print("enabledCommsMask: ");   Serial.println(deviceConfig.enabledCommsMask, BIN);
+    Serial.print("altitude: ");           Serial.println(deviceConfig.altitude);
 
     Serial.println("--- LoRaWAN Region ---");  
     #if defined(CFG_eu868)
@@ -1125,16 +1158,13 @@ void loop()
     {
         last1000Ms = now;
         
-        if ((isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::BLUETOOTH_BIT) && bluetooth.hasConnectedClient()) 
-          ||(isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::WIFI_BIT) && wifi.hasConnectedClient())
-          ||    !screen.isSleeping()
-          ||    DEBUG_ENABLE)
+        if (isLiveDataRequested())
         {
             handleMeasurements();
         }
         else
         {
-            handleVocNoxSensor();
+            handleVocNoxSensor();   // Sensirion algorithms need to be called periodically (every second even if data are not used)
         }
         handleBluetooth();
     }
@@ -1144,9 +1174,9 @@ void loop()
     {
         last60000Ms = now;
 
-        if (isCommEnabled(deviceConfig.enabledCommsMask, CommsBit::LORAWAN_BIT))
+        if (isLoRaWANEnabled())
         {
-            if (now - measurement.acquiredMs > 1500)
+            if (isMeasurementStale(now))
             {
                 handleMeasurements();
             }
