@@ -54,18 +54,14 @@ namespace LedColor
     static constexpr RGB BLUE    = {  0,   0, 255};
     static constexpr RGB MAGENTA = {255,   0, 255};
     static constexpr RGB GREEN   = {  0, 255,   0};
-    static constexpr RGB ORANGE  = {255,  75,   0};
-    static constexpr RGB PURPLE  = {128,   0, 255};
+    static constexpr RGB ORANGE  = {255,  10,   0};
+    static constexpr RGB PURPLE  = {128,   0,  50};
     static constexpr RGB RED     = {255,   0,   0};
-    static constexpr RGB CYAN    = {  0, 255, 255};
-    static constexpr RGB YELLOW  = {255, 255,   0};
+    static constexpr RGB CYAN    = {  0,  90, 255};
+    static constexpr RGB YELLOW  = {255, 40 ,   0};
     static constexpr RGB WHITE   = {255, 255, 255};
-    static constexpr RGB AMBER   = {255, 140,   0};
-    static constexpr RGB LIME    = {150, 255,   0};
-    static constexpr RGB PINK    = {255,  20, 147};
     static constexpr RGB TEAL    = {  0, 128, 128};
-    static constexpr RGB BROWN   = {139,  69,  19};
-    static constexpr RGB GOLD    = {255, 215,   0};
+    static constexpr RGB BROWN   = {255,  30,  20};
 }
 
 
@@ -454,7 +450,7 @@ inline StatusLED::BlinkProfile StatusLED::colorFor(Indicator i)
             return {LedColor::BROWN, Delay::MS_0, Delay::MS_0, false};
         
         case Indicator::LORAWAN_TX:
-            return {LedColor::AMBER, Delay::MS_0, Delay::MS_0, false};
+            return {LedColor::MAGENTA, Delay::MS_0, Delay::MS_0, false};
 
         default:
             return {LedColor::OFF, Delay::MS_0, Delay::MS_0, false};
