@@ -63,8 +63,9 @@ class LoRaWANCommunication : public Communication
          * @param appKey              Application Key (16 bytes).
          * @param payloadBuilder      Function pointer to a payload builder function that fills the buffer with data to send.
          * @param autoUplinkInterval  Interval in seconds for automatic uplink transmissions.
+         * @param firstUplinkUptimeS  Minimum uptime in seconds since boot before the first uplink (0 = right after join).
          */
-        void configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder builder, uint32_t autoUplinkInterval);
+        void configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder builder, uint32_t autoUplinkInterval, uint32_t firstUplinkUptimeS = 0);
         
         /**
          * @brief Initialize the LoRaWAN communication module.
@@ -149,6 +150,8 @@ class LoRaWANCommunication : public Communication
         uint8_t appKey[16];  // Application Key
 
         bool joined = false;    // True if the device has successfully joined the LoRaWAN network
+
+        uint32_t firstUplinkUptimeS = 0;         // Minimum uptime (since boot) before the first automatic uplink
 
         uint32_t autoUplinkInterval = 60;        // Interval in seconds for automatic uplink transmissions
         PayloadBuilder payloadBuilder = nullptr; // Function to build the payload for uplink messages   
@@ -265,7 +268,7 @@ inline LoRaWANCommunication::LoRaWANCommunication()
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-inline void LoRaWANCommunication::configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder payloadBuilder, uint32_t autoUplinkInterval)
+inline void LoRaWANCommunication::configure(uint8_t nss, uint8_t rst, uint8_t dio0, uint8_t dio1, const uint8_t devEui[8], const uint8_t appEui[8], const uint8_t appKey[16], PayloadBuilder payloadBuilder, uint32_t autoUplinkInterval, uint32_t firstUplinkUptimeS)
 {
     nssPin = nss;
     rstPin = rst;
@@ -277,6 +280,7 @@ inline void LoRaWANCommunication::configure(uint8_t nss, uint8_t rst, uint8_t di
     memcpy(this->appKey, appKey, sizeof(this->appKey));
     this->payloadBuilder = payloadBuilder;
     this->autoUplinkInterval = autoUplinkInterval;
+    this->firstUplinkUptimeS = firstUplinkUptimeS;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -450,7 +454,11 @@ inline void LoRaWANCommunication::handleEvent(ev_t event)
             LMIC_setLinkCheckMode(0);
             LMIC_setAdrMode(1);
             if (joinedCb) joinedCb();
-            handleAutoSend();
+            {
+                uint32_t uptimeS = millis() / 1000;
+                if (uptimeS < firstUplinkUptimeS) scheduleNextSend(firstUplinkUptimeS - uptimeS);
+                else                              handleAutoSend();
+            }
             break;
 
         case EV_JOIN_FAILED:

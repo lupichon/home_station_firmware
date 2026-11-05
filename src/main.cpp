@@ -136,6 +136,7 @@ unsigned long last1000Ms = 0;
 unsigned long last60000Ms= 0;
 
 constexpr unsigned long lorawanAutoUplinkInterval_S = 600;
+constexpr unsigned long lorawanFirstUplinkUptime_S  = 1800;
 
 // ==================== Counts ====================
 int sensorCount = Sensor::getSensorCount();
@@ -703,8 +704,9 @@ void initCommunication()
                             size_t len = serialize(avg, buf, maxLen);
                             return static_cast<uint8_t>(len);
                           },
-                          lorawanAutoUplinkInterval_S);
-        setLoRaWANCallbacks(); 
+                          lorawanAutoUplinkInterval_S,
+                          lorawanFirstUplinkUptime_S);
+        setLoRaWANCallbacks();
         lorawan.begin();
     }
 
