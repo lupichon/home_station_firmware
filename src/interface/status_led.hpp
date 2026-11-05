@@ -164,6 +164,7 @@ class StatusLED
         // Indicator sequence state
         unsigned long phaseStartMs          = 0;
         int8_t        currentIndicatorIndex = -1;
+        bool          indicatorsShown       = false; // Indicators already played in this off period
 
         /**
          * @brief Defines the display behavior of an LED state or indicator.
@@ -244,6 +245,7 @@ inline void StatusLED::setState(State newState)
     state                 = newState;
     lastToggleMs          = millis();
     ledOn                 = true;
+    indicatorsShown       = false;
     currentIndicatorIndex = -1;
     phaseStartMs          = millis();
 }
@@ -306,6 +308,9 @@ inline void StatusLED::update()
         // ── State display phase ──
         BlinkProfile p = profileFor(state);
 
+        // Long-off profiles (OK): indicators play inside the off period
+        bool longOff = p.blink && p.offMs >= STATE_PHASE_MS;
+
         if (p.blink)
         {
             unsigned long elapsed = now - lastToggleMs;
@@ -315,6 +320,7 @@ inline void StatusLED::update()
             {
                 lastToggleMs = now;
                 ledOn = !ledOn;
+                if (ledOn) indicatorsShown = false;
             }
 
             setColor(
@@ -329,10 +335,18 @@ inline void StatusLED::update()
         }
 
         // Switch to the indicator sequence after the state phase
-        if (activeCount > 0 && now - phaseStartMs >= STATE_PHASE_MS)
+        bool startSequence = false;
+        if (activeCount > 0)
         {
+            if (longOff) startSequence = !ledOn && !indicatorsShown;
+            else         startSequence = now - phaseStartMs >= STATE_PHASE_MS;
+        }
+
+        if (startSequence)
+        {
+            indicatorsShown       = true;
             currentIndicatorIndex = -2;
-            phaseStartMs = now;
+            phaseStartMs          = now;
         }
     }
     else if (currentIndicatorIndex == -2)
@@ -353,8 +367,14 @@ inline void StatusLED::update()
         {
             currentIndicatorIndex = -1;
             phaseStartMs = now;
-            lastToggleMs = now;
-            ledOn        = true;
+
+            // Long-off profiles keep their own cycle timing
+            BlinkProfile sp = profileFor(state);
+            if (!(sp.blink && sp.offMs >= STATE_PHASE_MS))
+            {
+                lastToggleMs = now;
+                ledOn        = true;
+            }
             return;
         }
 
