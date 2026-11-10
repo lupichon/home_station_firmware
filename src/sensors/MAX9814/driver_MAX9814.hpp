@@ -23,13 +23,17 @@ class MAX9814Sensor : public Sensor
 
         bool soundDetected = false; // Indicates whether sound has been detected since the last read
 
-        int signalMax = 0;     // Maximum ADC value measured during the current window
-        int signalMin = 4095;  // Minimum ADC value measured during the current window
-
-        unsigned long windowStart = 0; // Timestamp marking the beginning of the current sampling window
-
         static constexpr unsigned long WINDOW_MS = 60; // Duration of the sound sampling window in milliseconds
+        static constexpr uint8_t BUCKET_COUNT = 6;     // Number of buckets for sound sampling within the window
+        static constexpr unsigned long BUCKET_MS = WINDOW_MS / BUCKET_COUNT; // Duration of each sound sampling bucket within the window
+        static_assert(WINDOW_MS % BUCKET_COUNT == 0, "WINDOW_MS must be a multiple of BUCKET_COUNT");
 
+        int bucketMax[BUCKET_COUNT];    // Maximum ADC value measured in each bucket
+        int bucketMin[BUCKET_COUNT];    // Minimum ADC value measured in each bucket
+        uint8_t currentBucket = 0;      // Index of the current sound sampling bucket
+        unsigned long bucketStart = 0;  // Timestamp marking the beginning of the current sound sampling bucket
+
+        // TODO: revoir le seuil avec la nouvelle fonction update + appel a handleSoundSensor à chaque boucle
         static constexpr int THRESHOLD = 200; // Minimum signal amplitude required to trigger sound detection
 
     // ── Public interface ────────────────────────────────────────────────────
@@ -95,6 +99,13 @@ inline bool MAX9814Sensor::begin()
     // Configure the ADC for 12-bit resolution (0-4095)
     analogReadResolution(12);
 
+    for (int i = 0; i < BUCKET_COUNT; i++)
+    {
+        bucketMax[i] = 0;
+        bucketMin[i] = 4095;
+    }
+    bucketStart = millis();
+
     initialized = true;
 
     return true;
@@ -107,32 +118,38 @@ inline bool MAX9814Sensor::begin()
 
 inline void MAX9814Sensor::update()
 {
+    if (!initialized) return;
+
     // Read the current analog microphone signal
     int sample = analogRead(pin);
 
-    // Track the signal range during the current sampling window
-    if (sample > signalMax)
+    // Update the current bucket with the new sample
+    if (sample > bucketMax[currentBucket]) bucketMax[currentBucket] = sample;
+    if (sample < bucketMin[currentBucket]) bucketMin[currentBucket] = sample;
+
+    unsigned long now = millis();
+    if (now - bucketStart >= BUCKET_MS)
     {
-        signalMax = sample;
-    }
+        // Evaluate the amplitude over the whole sliding window
+        int maxValue = 0; 
+        int minValue = 4095;
 
-    if (sample < signalMin)
-    {
-        signalMin = sample;
-    }
+        for (uint8_t i = 0; i < BUCKET_COUNT; i++)
+        {
+            if (bucketMax[i] > maxValue) maxValue = bucketMax[i];
+            if (bucketMin[i] < minValue) minValue = bucketMin[i];
+        }
 
-    // Evaluate the signal once the sampling window has elapsed
-    if (millis() - windowStart >= WINDOW_MS)
-    {
-        int amplitude = signalMax - signalMin;
+        if (maxValue - minValue > THRESHOLD)
+        {
+            soundDetected = true;
+        }
 
-        // Detect sound if the signal amplitude exceeds the threshold
-        soundDetected = (amplitude > THRESHOLD);
-
-        // Reset the sampling window
-        signalMax = 0;
-        signalMin = 4095;
-        windowStart = millis();
+        // Move to the next bucket, overwritting the oldest one
+        currentBucket = (currentBucket + 1) % BUCKET_COUNT;
+        bucketMax[currentBucket] = 0;
+        bucketMin[currentBucket] = 4095;
+        bucketStart = now;
     }
 }
 

@@ -1173,13 +1173,12 @@ void loop()
     handleWatchdog();
     handleLoRaWAN();
     handleWifi();
+    handleSoundSensor();
 
     // Task executed every 10 ms
     if (now - last10Ms >= TASK_10_MS)
     {
         last10Ms = now;
-
-        handleSoundSensor();
     }
 
     // Task executed every 100 ms
