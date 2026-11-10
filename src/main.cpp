@@ -39,7 +39,7 @@
 #include "communication/LoRaWAN/lorawan.hpp"
 
 // ==================== Interface ====================
-#include "interface/status_led.hpp"
+#include "interface/led/status_led.hpp"
 #include "interface/display_SSD1306.hpp"
 #include "interface/button.hpp"
 #include "interface/buzzer.hpp"
@@ -70,7 +70,13 @@ Clock   systemClock;
 Storage storage;
 
 // ==================== Interface ====================
-StatusLED      statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
+// ------------------- LEDs -------------------------
+LED            ledRed(STATUS_LED_RED_PIN, 0);
+LED            ledGreen(STATUS_LED_GREEN_PIN, 1);
+LED            ledBlue(STATUS_LED_BLUE_PIN, 2);
+RgbLED         rgbLed(ledRed, ledGreen, ledBlue);
+StatusLED      statusLED(rgbLed);
+// ------------------- LEDs -------------------------
 DisplaySSD1306 screen(systemClock);
 Button         button(SCREEN_BUTTON_PIN);
 Buzzer         buzzer(BUZZER_PIN, BuzzerType::PASSIVE);

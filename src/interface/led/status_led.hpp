@@ -8,20 +8,7 @@
 #pragma once
 
 #include <Arduino.h>
-
-
-// ============================================================
-// RGB color definition
-// ============================================================
-
-/**
- * @brief Represents an RGB color using 8-bit intensity values.
- */
-struct RGB
-{
-    uint8_t r, g, b;
-};
-
+#include "rgb_led.hpp"
 
 // ============================================================
 // Timing constants
@@ -38,30 +25,6 @@ namespace Delay
     static constexpr unsigned long MS_500  = 500;
     static constexpr unsigned long MS_1000 = 1000;
     static constexpr unsigned long MS_5000 = 5000;
-}
-
-
-// ============================================================
-// LED color definitions
-// ============================================================
-
-/**
- * @brief Predefined RGB colors used by the status LED.
- */
-namespace LedColor
-{
-    static constexpr RGB OFF     = {  0,   0,   0};
-    static constexpr RGB BLUE    = {  0,   0, 255};
-    static constexpr RGB MAGENTA = {255,   0, 255};
-    static constexpr RGB GREEN   = {  0, 255,   0};
-    static constexpr RGB ORANGE  = {255,  10,   0};
-    static constexpr RGB PURPLE  = {128,   0,  50};
-    static constexpr RGB RED     = {255,   0,   0};
-    static constexpr RGB CYAN    = {  0,  90, 255};
-    static constexpr RGB YELLOW  = {255, 40 ,   0};
-    static constexpr RGB WHITE   = {255, 255, 255};
-    static constexpr RGB TEAL    = {  0, 128, 128};
-    static constexpr RGB BROWN   = {255,  30,  20};
 }
 
 
@@ -111,7 +74,7 @@ class StatusLED
          * @param greenPin GPIO pin connected to the green LED channel.
          * @param bluePin GPIO pin connected to the blue LED channel.
          */
-        StatusLED(uint8_t redPin, uint8_t greenPin, uint8_t bluePin);
+        StatusLED(RgbLED& rgbLed);
 
         /**
          * @brief Configure the RGB LED pins and initialize the LED state.
@@ -138,17 +101,9 @@ class StatusLED
          */
         void update();
 
-        /**
-         * @brief Set the RGB LED output color directly.
-         * @param red Red channel intensity from 0 to 255.
-         * @param green Green channel intensity from 0 to 255.
-         * @param blue Blue channel intensity from 0 to 255.
-         */
-        void setColor(uint8_t red, uint8_t green, uint8_t blue);
-
     // ── Private members ───────────────────────────────────────────────────
     private:
-        uint8_t redPin, greenPin, bluePin;  // GPIO pins for the RGB channels
+        RgbLED& rgbLed;                       // RGB LED instance
 
         State state;                        // Current main operating state
         uint16_t indicatorFlags = 0;        // Bitmask of active indicators
@@ -209,8 +164,8 @@ class StatusLED
 // Constructor
 // ─────────────────────────────────────────────────────────────────────────────
 
-inline StatusLED::StatusLED(uint8_t r, uint8_t g, uint8_t b)
-    : redPin(r), greenPin(g), bluePin(b), state(State::IDLE) {}
+inline StatusLED::StatusLED(RgbLED& rgbLed)
+    : rgbLed(rgbLed), state(State::IDLE) {}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -219,17 +174,7 @@ inline StatusLED::StatusLED(uint8_t r, uint8_t g, uint8_t b)
 
 inline void StatusLED::begin()
 {
-    // Configure the RGB channels as outputs
-    ledcSetup(0, 5000, 8);        // channel 0: 5kHz, 8-bit resolution
-    ledcAttachPin(redPin, 0);
-
-    ledcSetup(1, 5000, 8);        // channel 1
-    ledcAttachPin(greenPin, 1);
-
-    ledcSetup(2, 5000, 8);        // channel 2
-    ledcAttachPin(bluePin, 2);
-
-    // Start in the idle state
+    rgbLed.begin();
     setState(State::IDLE);
 }
 
@@ -323,15 +268,12 @@ inline void StatusLED::update()
                 if (ledOn) indicatorsShown = false;
             }
 
-            setColor(
-                ledOn ? p.color.r : 0,
-                ledOn ? p.color.g : 0,
-                ledOn ? p.color.b : 0
-            );
+            if (ledOn) rgbLed.setColor(p.color);
+            else       rgbLed.off();
         }
         else
         {
-            setColor(p.color.r, p.color.g, p.color.b);
+            rgbLed.setColor(p.color);
         }
 
         // Switch to the indicator sequence after the state phase
@@ -352,7 +294,7 @@ inline void StatusLED::update()
     else if (currentIndicatorIndex == -2)
     {
         // ── Entry pause before the first indicator ──
-        setColor(0, 0, 0);
+        rgbLed.off();
 
         if (now - phaseStartMs >= PULSE_GAP_MS)
         {
@@ -383,11 +325,11 @@ inline void StatusLED::update()
 
         if (elapsed < PULSE_ON_MS)
         {
-            setColor(c.color.r, c.color.g, c.color.b);
+            rgbLed.setColor(c.color);
         }
         else if (elapsed < PULSE_ON_MS + PULSE_GAP_MS)
         {
-            setColor(0, 0, 0);
+            rgbLed.off();
         }
         else
         {
@@ -396,20 +338,6 @@ inline void StatusLED::update()
         }
     }
 }
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Color Output
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline void StatusLED::setColor(uint8_t r, uint8_t g, uint8_t b)
-{
-    // Set the PWM intensity of each RGB channel
-    ledcWrite(0, r);  // channel 0 -> red
-    ledcWrite(1, g);  // channel 1 -> green
-    ledcWrite(2, b);  // channel 2 -> blue
-}
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State Profiles
@@ -420,25 +348,25 @@ inline StatusLED::BlinkProfile StatusLED::profileFor(State s)
     switch (s)
     {
         case State::IDLE:
-            return {LedColor::OFF, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::OFF, Delay::MS_0, Delay::MS_0, false};
 
         case State::STARTING:
-            return {LedColor::WHITE, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::WHITE, Delay::MS_0, Delay::MS_0, false};
 
         case State::OK:
-            return {LedColor::GREEN, Delay::MS_100, Delay::MS_5000, true};
+            return {LEDColor::GREEN, Delay::MS_100, Delay::MS_5000, true};
 
         case State::WARNING_SENSOR:
-            return {LedColor::ORANGE, Delay::MS_500, Delay::MS_500, true};
+            return {LEDColor::ORANGE, Delay::MS_500, Delay::MS_500, true};
 
         case State::WARNING_COMMUNICATION:
-            return {LedColor::PURPLE, Delay::MS_500, Delay::MS_500, true};
+            return {LEDColor::PURPLE, Delay::MS_500, Delay::MS_500, true};
 
         case State::ERROR:
-            return {LedColor::RED, Delay::MS_500, Delay::MS_500, true};
+            return {LEDColor::RED, Delay::MS_500, Delay::MS_500, true};
 
         default:
-            return {LedColor::OFF, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::OFF, Delay::MS_0, Delay::MS_0, false};
     }
 }
 
@@ -452,27 +380,27 @@ inline StatusLED::BlinkProfile StatusLED::colorFor(Indicator i)
     switch (i)
     {
         case Indicator::BLUETOOTH_CONNECTED:
-            return {LedColor::BLUE, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::BLUE, Delay::MS_0, Delay::MS_0, false};
 
         case Indicator::WIFI_CONNECTED:
-            return {LedColor::CYAN, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::CYAN, Delay::MS_0, Delay::MS_0, false};
 
         case Indicator::ALARM_ARMED:
-            return {LedColor::YELLOW, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::YELLOW, Delay::MS_0, Delay::MS_0, false};
 
         case Indicator::ALARM_TRIGGERED:
-            return {LedColor::RED, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::RED, Delay::MS_0, Delay::MS_0, false};
 
         case Indicator::BUTTON_HELD:
-            return {LedColor::TEAL, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::TEAL, Delay::MS_0, Delay::MS_0, false};
 
         case Indicator::TIME_SYNCED:
-            return {LedColor::BROWN, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::BROWN, Delay::MS_0, Delay::MS_0, false};
         
         case Indicator::LORAWAN_TX:
-            return {LedColor::MAGENTA, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::MAGENTA, Delay::MS_0, Delay::MS_0, false};
 
         default:
-            return {LedColor::OFF, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::OFF, Delay::MS_0, Delay::MS_0, false};
     }
 }

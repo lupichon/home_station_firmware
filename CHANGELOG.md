@@ -3,7 +3,7 @@
 ## [1.0.1] - 2026-11-04
 ### Added
 - BMP280 : pression ramenée au niveau de la mer.
-- Outil `tools/led_tuner` (environnement `led_tuner`) pour régler les couleurs de la LED via le port série.
+- Outil `tools/rgb_led_tuner` (environnement `rgb_led_tuner`) pour régler les couleurs de la LED via le port série.
 
 ### Changed
 - Couleurs de la LED de statut recalibrées.
