@@ -155,8 +155,10 @@ int sensorFailureCount[SENSOR_COUNT] = {0};
 constexpr size_t SGP41_SENSOR_INDEX = 8; // Must match the position of VocNoxSensor in sensors[]
 static_assert(SGP41_SENSOR_INDEX < SENSOR_COUNT, "SGP41 index out of range");
 
+// ==================== Variables state ====================
 float cachedTemperature = NAN;
 float cachedHumidity    = NAN;
+bool doorOpen = false;
 
 // ============== Utility functions ====================
 
@@ -247,6 +249,8 @@ void setWifiCallbacks()
             if (i > 0) json += ",";
             json += "\"" + String(sensors[i]->getName()) + "\"";
         }
+        if (sensorCount > 0) json += ",";
+        json += "\"reed switch\"";
         json += "]";
         return json;
     });
@@ -302,6 +306,12 @@ void setWifiCallbacks()
         {
             storage.putString(Storage::alarmTargetUUIDKey, newDeviceConfig.alarmTargetUUID);
             deviceConfig.alarmTargetUUID = newDeviceConfig.alarmTargetUUID;
+        }
+
+        if (newDeviceConfig.doorStateUUID != deviceConfig.doorStateUUID)
+        {
+            storage.putString(Storage::doorStateUUIDKey, newDeviceConfig.doorStateUUID);
+            deviceConfig.doorStateUUID = newDeviceConfig.doorStateUUID;
         }
 
         if (newDeviceConfig.wifiApSSID != deviceConfig.wifiApSSID)
@@ -385,7 +395,8 @@ void setWifiCallbacks()
         json += boolField("motion",       measurement.motion)      + ",";
         json += boolField("sound",        measurement.sound)       + ",";
         json += boolField("obstacle",     measurement.obstacle)    + ",";
-        json += boolField("vibration",    measurement.vibration);
+        json += boolField("vibration",    measurement.vibration)   + ",";
+        json += boolField("doorOpen",     measurement.doorOpen);
         json += "}";
 
         #if DEBUG_ENABLE
@@ -524,6 +535,26 @@ void setBluetoothCallbacks()
             #endif
         }
     });
+
+    if (isSensorEnabled(deviceConfig.enabledSensorsMask, SensorsBit::REED_SWITCH_BIT))
+    {
+        bluetooth.setDoorStateCallback([](bool open)
+        {
+            if (open)
+            {
+                doorOpen = true;
+                #if DEBUG_ENABLE
+                Serial.println("Door open.");
+                #endif
+            }
+            else
+            {
+                #if DEBUG_ENABLE
+                Serial.println("Door closed.");
+                #endif
+            }
+        });
+    }
 }
 
 // Set up the callbacks for LoRaWAN communication to handle join events and transmission completion
@@ -646,6 +677,7 @@ void initStorage()
     loadOrCreateConfig(storage, Storage::timeSyncUUIDKey,        "Time Sync Characteristic UUID",    deviceConfig.timeSyncUUID,      36);
     loadOrCreateConfig(storage, Storage::alarmTargetUUIDKey,     "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID,   36);
     loadOrCreateConfig(storage, Storage::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
+    loadOrCreateConfig(storage, Storage::doorStateUUIDKey,       "Door State Characteristic UUID",   deviceConfig.doorStateUUID,     36);
     loadOrCreateConfig(storage, Storage::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
     loadOrCreateConfig(storage, Storage::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
     loadOrCreateConfig(storage, Storage::aesKeyKey,              "AES Key",                          deviceConfig.aesKey,            sizeof(deviceConfig.aesKey));
@@ -686,7 +718,8 @@ void initCommunication()
                             deviceConfig.characteristicUUID, 
                             deviceConfig.timeSyncUUID, 
                             deviceConfig.alarmTargetUUID, 
-                            deviceConfig.wifiControlUUID);
+                            deviceConfig.wifiControlUUID,
+                            deviceConfig.doorStateUUID);
         setBluetoothCallbacks();
         bluetooth.begin();
     }
@@ -955,6 +988,11 @@ void handleMeasurements()
             }
         }
     }
+    if (isSensorEnabled(deviceConfig.enabledSensorsMask, REED_SWITCH_BIT))
+    {
+        measurement.doorOpen = doorOpen;
+        doorOpen = false;
+    }
     measurement.timestamp = systemClock.now();
     measurement.acquiredMs = millis();
 
@@ -1083,6 +1121,7 @@ void printDebugInfo()
     Serial.print("characteristicUUID: "); Serial.println(deviceConfig.characteristicUUID);
     Serial.print("timeSyncUUID: ");       Serial.println(deviceConfig.timeSyncUUID);
     Serial.print("alarmTargetUUID: ");    Serial.println(deviceConfig.alarmTargetUUID);
+    Serial.print("doorStateUUID: ");      Serial.println(deviceConfig.doorStateUUID);
     Serial.print("alarmArmed: ");         Serial.println(deviceConfig.alarmArmed ? "true" : "false");
     Serial.print("alarmTargetEpoch: ");   Serial.println(deviceConfig.alarmTargetEpoch);
     Serial.print("utcOffset: ");          Serial.println(deviceConfig.utcOffset);

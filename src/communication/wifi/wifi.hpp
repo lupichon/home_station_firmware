@@ -312,6 +312,10 @@ inline void WiFiCommunication::handleGetConfig()
     json += deviceConfig->wifiControlUUID;
     json += "\"";
 
+    json += ",\"doorStateUUID\":\"";
+    json += deviceConfig->doorStateUUID;
+    json += "\"";
+
     json += ",\"wifiApSSID\":\"";
     json += deviceConfig->wifiApSSID;
     json += "\"";
@@ -368,6 +372,7 @@ inline void WiFiCommunication::handlePostConfig()
     String timeSyncUUID            = doc["timeSyncUUID"]       | "";
     String alarmTargetUUID         = doc["alarmTargetUUID"]    | "";
     String wifiControlUUID         = doc["wifiControlUUID"]    | "";
+    String doorStateUUID           = doc["doorStateUUID"]      | "";
     String wifiApSSID              = doc["wifiApSSID"]         | "";
     String wifiApPassword          = doc["wifiApPassword"]     | "";
     String aesKey                  = doc["aesKey"]             | "";
@@ -410,7 +415,8 @@ inline void WiFiCommunication::handlePostConfig()
     }
 
     if (serviceUUID.length() == 0 || characteristicUUID.length() == 0 ||
-        timeSyncUUID.length() == 0 || alarmTargetUUID.length() == 0 || wifiControlUUID.length() == 0)
+        timeSyncUUID.length() == 0 || alarmTargetUUID.length() == 0 ||
+        wifiControlUUID.length() == 0 || doorStateUUID.length() == 0)
     {
         server.send(400, "application/json", "{\"ok\":false,\"error\":\"Bluetooth UUID fields cannot be empty\"}");
         return;
@@ -445,6 +451,7 @@ inline void WiFiCommunication::handlePostConfig()
     newDeviceConfig.timeSyncUUID       = timeSyncUUID;
     newDeviceConfig.alarmTargetUUID    = alarmTargetUUID;
     newDeviceConfig.wifiControlUUID    = wifiControlUUID;
+    newDeviceConfig.doorStateUUID      = doorStateUUID;
     newDeviceConfig.wifiApSSID         = wifiApSSID;
     newDeviceConfig.wifiApPassword     = wifiApPassword;
     newDeviceConfig.enabledSensorsMask = enabledSensorsMask;

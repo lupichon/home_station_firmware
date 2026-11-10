@@ -170,6 +170,8 @@ class Storage
         static constexpr const char* characteristicUUIDKey  = "charUUID";
         static constexpr const char* timeSyncUUIDKey        = "tSynUUID";
         static constexpr const char* alarmTargetUUIDKey     = "alTaUUID";
+        static constexpr const char* wifiControlUUIDKey     = "wiCoUUID";
+        static constexpr const char* doorStateUUIDKey       = "doStUUID";
         static constexpr const char* wifiApSSIDKey          = "apSSID";
         static constexpr const char* wifiApPasswordKey      = "apPass";
         static constexpr const char* utcOffsetKey           = "utcOffset";
@@ -177,7 +179,6 @@ class Storage
         static constexpr const char* alarmTargetKey         = "alarmTarget";
         static constexpr const char* enabledSensorsMaskKey  = "enSensMask";
         static constexpr const char* enabledCommsMaskKey    = "enCommMask";
-        static constexpr const char* wifiControlUUIDKey     = "wiCoUUID";
         static constexpr const char* aesKeyKey              = "aesKey";
         static constexpr const char* altitudeKey            = "altitude";
         

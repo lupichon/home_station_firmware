@@ -164,6 +164,7 @@ static const char WIFI_MONITORING_PAGE[] PROGMEM = R"rawhtml(
         <tr><td class="key">Sound</td><td class="value" id="v-sound">&mdash;</td></tr>
         <tr><td class="key">Obstacle</td><td class="value" id="v-obstacle">&mdash;</td></tr>
         <tr><td class="key">Vibration</td><td class="value" id="v-vibration">&mdash;</td></tr>
+        <tr><td class="key">Door</td><td class="value" id="v-doorOpen">&mdash;</td></tr>
     </table>
 
     <div class="status-row">
@@ -202,7 +203,7 @@ static const char WIFI_MONITORING_PAGE[] PROGMEM = R"rawhtml(
 
     function setBool(id, value) {
         const el = document.getElementById(id);
-        el.textContent = value ? 'Detected' : 'Clear';
+        el.textContent = value ? 'true' : 'false';
         el.className = 'value' + (value ? ' active' : '');
     }
 
@@ -224,6 +225,7 @@ static const char WIFI_MONITORING_PAGE[] PROGMEM = R"rawhtml(
         setBool('v-sound',        !!json.sound);
         setBool('v-obstacle',     !!json.obstacle);
         setBool('v-vibration',    !!json.vibration);
+        setBool('v-doorOpen',     !!json.doorOpen);
     }
 
     function setStatus(ok, message) {
