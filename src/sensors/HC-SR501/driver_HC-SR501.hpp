@@ -8,32 +8,15 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../sensor.hpp"
+#include "../interrupt_sensor.hpp"
 
 
 // ============================================================
 // HCSR501Sensor class definition
 // ============================================================
 
-class HCSR501Sensor : public Sensor
+class HCSR501Sensor : public InterruptSensor
 {
-    // ── Private members ───────────────────────────────────────────────────
-    private:
-        int pin;  // GPIO pin connected to the HC-SR501 output
-
-        volatile bool motionDetected = false; // Indicates whether motion has been detected since the last read
-
-        /**
-         * @brief Interrupt service routine for motion detection.
-         *
-         * This function is called when the HC-SR501 output changes to HIGH.
-         * It sets the motion detection flag associated with the sensor.
-         *
-         * @param arg Pointer to the HCSR501Sensor instance that triggered
-         *            the interrupt.
-         */
-        static void IRAM_ATTR handleInterrupt(void* arg);
-
     // ── Public interface ────────────────────────────────────────────────────
     public:
 
@@ -44,23 +27,7 @@ class HCSR501Sensor : public Sensor
         HCSR501Sensor(int pin);
 
         /**
-         * @brief Initialize the HC-SR501 sensor.
-         *
-         * Configures the sensor GPIO as a digital input and attaches an
-         * interrupt triggered on the rising edge of the sensor output.
-         *
-         * @return true if the GPIO supports interrupts and the interrupt
-         *         was configured, false otherwise.
-         */
-        bool begin() override;
-
-        /**
          * @brief Read and consume the current motion detection event.
-         *
-         * Copies the motion detection flag into the Measurement object,
-         * then clears the internal flag so that the same event is not
-         * reported again on the next read.
-         *
          * @param m Measurement object that will receive the motion state.
          * @return true after the motion state has been read.
          */
@@ -68,10 +35,6 @@ class HCSR501Sensor : public Sensor
 
         /**
          * @brief Format the current motion detection state for display.
-         *
-         * The returned string indicates whether motion has been detected
-         * since the previous sensor read.
-         *
          * @param m Measurement containing the motion detection state.
          * @return Pointer to a formatted null-terminated string.
          */
@@ -88,42 +51,8 @@ class HCSR501Sensor : public Sensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline HCSR501Sensor::HCSR501Sensor(int pin)
-    : Sensor("HC-SR501"),
-      pin(pin)
+    : InterruptSensor("HC-SR501", pin, HIGH) // Output goes HIGH when motion is detected
 {
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Initialization
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline bool HCSR501Sensor::begin()
-{
-    // Configure the HC-SR501 output as a digital input
-    pinMode(pin, INPUT);
-
-    // Check whether the selected GPIO supports interrupts
-    int interruptPin = digitalPinToInterrupt(pin);
-
-    if (interruptPin == NOT_AN_INTERRUPT)
-    {
-        initialized = false;
-    }
-    else
-    {
-        // Trigger the interrupt when motion is detected
-        attachInterruptArg(
-            interruptPin,
-            handleInterrupt,
-            this,
-            RISING
-        );
-
-        initialized = true;
-    }
-
-    return initialized;
 }
 
 
@@ -134,26 +63,9 @@ inline bool HCSR501Sensor::begin()
 inline bool HCSR501Sensor::read(Measurement& m)
 {
     // Copy the motion event into the Measurement structure
-    m.motion = motionDetected;
-
-    // Reset the event flag after it has been consumed
-    motionDetected = false;
+    m.motion = consumeEvent();
 
     return true;
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Interrupt Handler
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline void IRAM_ATTR HCSR501Sensor::handleInterrupt(void* arg)
-{
-    // Recover the sensor instance associated with the interrupt
-    HCSR501Sensor* sensor = static_cast<HCSR501Sensor*>(arg);
-
-    // Store the motion event for processing during the next read()
-    sensor->motionDetected = true;
 }
 
 

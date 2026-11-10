@@ -8,19 +8,15 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../sensor.hpp"
+#include "../interrupt_sensor.hpp"
 
 
 // ============================================================
 // FC51Sensor class definition
 // ============================================================
 
-class FC51Sensor : public Sensor
+class FC51Sensor : public InterruptSensor
 {
-    // ── Private members ───────────────────────────────────────────────────
-    private:
-        int pin;  // GPIO pin connected to the FC-51 digital output
-
     // ── Public interface ────────────────────────────────────────────────────
     public:
 
@@ -31,13 +27,7 @@ class FC51Sensor : public Sensor
         FC51Sensor(int pin);
 
         /**
-         * @brief Initialize the FC-51 sensor.
-         * @return true once the sensor input has been configured.
-         */
-        bool begin() override;
-
-        /**
-         * @brief Read the current obstacle detection state.
+         * @brief Read and consume the current obstacle detection event.
          * @param m Measurement object that will receive the obstacle state.
          * @return true after the sensor state has been read.
          */
@@ -61,24 +51,8 @@ class FC51Sensor : public Sensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline FC51Sensor::FC51Sensor(int pin)
-    : Sensor("FC-51"),
-      pin(pin)
+    : InterruptSensor("FC-51", pin, LOW) // Output goes LOW when an obstacle is detected
 {
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Initialization
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline bool FC51Sensor::begin()
-{
-    // Configure the FC-51 output as a digital input
-    pinMode(pin, INPUT);
-
-    initialized = true;
-
-    return initialized;
 }
 
 
@@ -88,8 +62,8 @@ inline bool FC51Sensor::begin()
 
 inline bool FC51Sensor::read(Measurement& m)
 {
-    // The FC-51 output is active LOW when an obstacle is detected
-    m.obstacle = (digitalRead(pin) == LOW);
+    // Copy the obstacle event into the Measurement structure
+    m.obstacle = consumeEvent();
 
     return true;
 }
