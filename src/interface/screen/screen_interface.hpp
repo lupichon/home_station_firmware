@@ -1,6 +1,8 @@
 /**
  * @file    screen_interface.hpp
  * @brief   Interface for screen drivers used by the HomeStation display controller.
+ * @author  Lucas Pichon
+ * @date    2026-11-12
  */
 
 #pragma once
@@ -11,7 +13,8 @@
  * @brief Drawing and power operations required by the screen controller.
  *
  * Drawing modifies a frame buffer; flush() presents it on the screen.
- * The controller currently lays out its pages for a 128x64 pixel display.
+ * The selected screen layout defines the required screen dimensions and
+ * text rendering behavior.
  */
 class ScreenInterface
 {
