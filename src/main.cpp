@@ -40,7 +40,8 @@
 
 // ==================== Interface ====================
 #include "interface/status_led.hpp"
-#include "interface/display_SSD1306.hpp"
+#include "interface/screen/screen_controller.hpp"
+#include "interface/screen/SSD1306/driver_SSD1306.hpp"
 #include "interface/button.hpp"
 #include "interface/buzzer.hpp"
 
@@ -71,7 +72,10 @@ Storage storage;
 
 // ==================== Interface ====================
 StatusLED      statusLED(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
-DisplaySSD1306 screen(systemClock);
+// -------------------- Display --------------------
+SSD1306 ssd1306;
+ScreenController screen(ssd1306, systemClock);
+// -------------------------------------------------
 Button         button(SCREEN_BUTTON_PIN);
 Buzzer         buzzer(BUZZER_PIN, BuzzerType::PASSIVE);
 AlarmManager   alarmManager(buzzer, systemClock);
