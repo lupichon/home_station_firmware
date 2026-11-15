@@ -13,21 +13,24 @@
 
 #include <Arduino.h>
 #include "core/pins.hpp"
-#include "interface/status_led.hpp"
+#include "interface/led/rgb_led.hpp"
 
-static StatusLED led(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN);
+LED    ledRed(STATUS_LED_RED_PIN,     0);
+LED    ledGreen(STATUS_LED_GREEN_PIN, 1);
+LED    ledBlue(STATUS_LED_BLUE_PIN,   2);
+RgbLED rgbLed(ledRed, ledGreen, ledBlue);
 
-static uint8_t values[3] = {0, 0, 0};
-static uint8_t selected  = 0;
-static const char NAMES[3] = {'R', 'G', 'B'};
+uint8_t     values[3] = {0, 0, 0};
+uint8_t     selected  = 0;
+const char  NAMES[3]  = {'R', 'G', 'B'};
 
-static void apply()
+void apply()
 {
-    led.setColor(values[0], values[1], values[2]);
+    rgbLed.setColor(values[0], values[1], values[2]);
     Serial.printf("[%c] R=%3u G=%3u B=%3u\n", NAMES[selected], values[0], values[1], values[2]);
 }
 
-static void adjust(int delta)
+void adjust(int delta)
 {
     values[selected] = (uint8_t)constrain((int)values[selected] + delta, 0, 255);
     apply();
@@ -36,7 +39,7 @@ static void adjust(int delta)
 void setup()
 {
     Serial.begin(115200);
-    led.begin();
+    rgbLed.begin();
     Serial.println("LED tuner: r/g/b select, +/- (1), ]/[ (10), 0/f min/max, n next, p print");
     apply();
 }
