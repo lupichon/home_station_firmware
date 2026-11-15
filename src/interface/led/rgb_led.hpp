@@ -31,7 +31,7 @@ namespace LEDColor
     static constexpr RGB RED     = {255,   0,   0};
     static constexpr RGB CYAN    = {  0,  90, 255};
     static constexpr RGB YELLOW  = {255,  40,   0};
-    static constexpr RGB WHITE   = {255, 255, 255};
+    static constexpr RGB PURE_WHITE = {255, 255, 255};
     static constexpr RGB TEAL    = {  0, 128, 128};
     static constexpr RGB BROWN   = {255,  30,  20};
 }

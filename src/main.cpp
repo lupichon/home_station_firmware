@@ -42,8 +42,9 @@
 #include "interface/screen/screen_controller.hpp"
 #include "interface/screen/SSD1306/driver_SSD1306.hpp"
 #include "interface/screen/layout/layout_128x64.hpp"
+#include "interface/led/led.hpp"
+#include "interface/led/rgb_led.hpp"
 #include "interface/led/status_led.hpp"
-#include "interface/display_SSD1306.hpp"
 #include "interface/button.hpp"
 #include "interface/buzzer.hpp"
 

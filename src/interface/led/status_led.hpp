@@ -351,7 +351,7 @@ inline StatusLED::BlinkProfile StatusLED::profileFor(State s)
             return {LEDColor::OFF, Delay::MS_0, Delay::MS_0, false};
 
         case State::STARTING:
-            return {LEDColor::WHITE, Delay::MS_0, Delay::MS_0, false};
+            return {LEDColor::PURE_WHITE, Delay::MS_0, Delay::MS_0, false};
 
         case State::OK:
             return {LEDColor::GREEN, Delay::MS_100, Delay::MS_5000, true};
