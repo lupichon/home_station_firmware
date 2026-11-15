@@ -38,6 +38,7 @@ struct Measurement
     bool sound         = false;     // Whether sound was detected
     bool obstacle      = false;     // Whether an obstacle was detected
     bool vibration     = false;     // Whether vibration was detected
+    bool doorOpen      = false;     // Whether the door was opened
 };
 
 // ============================================================
@@ -78,7 +79,7 @@ struct MeasurementAccumulator
     RunningAverage temperature, humidity, luminosity, pressure;
     RunningAverage co2, gasRaw, vocIndex, noxIndex;
 
-    bool motion = false, sound = false, obstacle = false, vibration = false;
+    bool motion = false, sound = false, obstacle = false, vibration = false, doorOpen = false;
 
     void add(const Measurement& m)
     {
@@ -99,6 +100,7 @@ struct MeasurementAccumulator
         sound     |= m.sound;
         obstacle  |= m.obstacle;
         vibration |= m.vibration;
+        doorOpen  |= m.doorOpen;
     }
 
     bool empty() const
@@ -106,7 +108,8 @@ struct MeasurementAccumulator
         return temperature.count == 0 && humidity.count == 0 &&
                luminosity.count  == 0 && pressure.count == 0 &&
                co2.count == 0 && gasRaw.count == 0 &&
-               vocIndex.count == 0 && noxIndex.count == 0;
+               vocIndex.count == 0 && noxIndex.count == 0 &&
+               !motion && !sound && !obstacle && !vibration && !doorOpen;
     }
 
     Measurement average() const
@@ -126,6 +129,7 @@ struct MeasurementAccumulator
         m.sound       = sound;
         m.obstacle    = obstacle;
         m.vibration   = vibration;
+        m.doorOpen    = doorOpen;
         return m;
     }
 
@@ -145,6 +149,7 @@ struct MeasurementAccumulator
         Serial.print("Sound: ");        Serial.println(sound);
         Serial.print("Obstacle: ");     Serial.println(obstacle);
         Serial.print("Vibration: ");    Serial.println(vibration);
+        Serial.print("Door Open: ");    Serial.println(doorOpen);
     }
 };
 
@@ -188,4 +193,5 @@ inline void clearMeasurement(Measurement& measurement)
     measurement.sound       = false;
     measurement.obstacle    = false;
     measurement.vibration   = false;
+    measurement.doorOpen    = false;
 }
