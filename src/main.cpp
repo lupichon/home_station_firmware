@@ -1007,6 +1007,9 @@ void handleMeasurements()
     {
         measurement.doorOpen = doorOpen;
         doorOpen = false;
+        #if DEBUG_ENABLE
+        Serial.println(String("Door state: ") + (measurement.doorOpen ? "open" : "closed"));    
+        #endif
     }
     measurement.timestamp = systemClock.now();
     measurement.acquiredMs = millis();
@@ -1163,10 +1166,10 @@ void printDebugInfo()
 // ==================== Setup and Loop ====================
 void setup()
 {
-    initWatchdog();
-    initSerial();
     initInterface();
+    initSerial();
     initStorage();
+    initWatchdog();
     initClock();
     initAlarmManager();
     initCommunication();
