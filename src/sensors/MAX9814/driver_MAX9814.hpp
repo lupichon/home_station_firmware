@@ -33,8 +33,7 @@ class MAX9814Sensor : public Sensor
         uint8_t currentBucket = 0;      // Index of the current sound sampling bucket
         unsigned long bucketStart = 0;  // Timestamp marking the beginning of the current sound sampling bucket
 
-        // TODO: revoir le seuil avec la nouvelle fonction update + appel a handleSoundSensor à chaque boucle
-        static constexpr int THRESHOLD = 200; // Minimum signal amplitude required to trigger sound detection
+        static constexpr int THRESHOLD = 1000; // Minimum signal amplitude required to trigger sound detection
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
@@ -144,6 +143,8 @@ inline void MAX9814Sensor::update()
         {
             soundDetected = true;
         }
+        Serial.print("delta: ");
+        Serial.println(maxValue - minValue);
 
         // Move to the next bucket, overwritting the oldest one
         currentBucket = (currentBucket + 1) % BUCKET_COUNT;
