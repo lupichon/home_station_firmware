@@ -30,6 +30,7 @@ class InterruptSensor : public Sensor
         int pin;          // GPIO pin connected to the sensor digital output
         int activeLevel;  // Output level when the sensor detects something (HIGH or LOW)
 
+        bool useLevel = false;               // Whether to use the level of the pin to determine the event
         volatile bool eventDetected = false; // Indicates whether an event has been detected since the last read
 
         /**
@@ -48,7 +49,7 @@ class InterruptSensor : public Sensor
          * @param pin         GPIO pin connected to the sensor digital output.
          * @param activeLevel Output level when something is detected (HIGH or LOW).
          */
-        InterruptSensor(const char* name, int pin, int activeLevel);
+        InterruptSensor(const char* name, int pin, int activeLevel, bool useLevel);
 
         /**
          * @brief Report and consume the current detection state.
@@ -84,10 +85,11 @@ class InterruptSensor : public Sensor
 // Constructor
 // ─────────────────────────────────────────────────────────────────────────────
 
-inline InterruptSensor::InterruptSensor(const char* name, int pin, int activeLevel)
+inline InterruptSensor::InterruptSensor(const char* name, int pin, int activeLevel, bool useLevel)
     : Sensor(name),
       pin(pin),
-      activeLevel(activeLevel)
+      activeLevel(activeLevel), 
+      useLevel(useLevel)
 {
 }
 
@@ -146,7 +148,7 @@ inline void IRAM_ATTR InterruptSensor::handleInterrupt(void* arg)
 inline bool InterruptSensor::consumeEvent()
 {
     // Event seen since the last read, or output still at its active level
-    bool active = eventDetected || (digitalRead(pin) == activeLevel);
+    bool active = eventDetected || (useLevel && digitalRead(pin) == activeLevel);
 
     // Reset the event flag after it has been consumed
     eventDetected = false;

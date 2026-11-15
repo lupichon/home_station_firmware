@@ -51,7 +51,7 @@ class SW420Sensor : public InterruptSensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline SW420Sensor::SW420Sensor(int pin)
-    : InterruptSensor("SW-420", pin, HIGH) // Output goes HIGH when a vibration is detected
+    : InterruptSensor("SW-420", pin, HIGH, false) // Output goes HIGH when a vibration is detected
 {
 }
 

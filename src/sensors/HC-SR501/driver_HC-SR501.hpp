@@ -51,7 +51,7 @@ class HCSR501Sensor : public InterruptSensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline HCSR501Sensor::HCSR501Sensor(int pin)
-    : InterruptSensor("HC-SR501", pin, HIGH) // Output goes HIGH when motion is detected
+    : InterruptSensor("HC-SR501", pin, HIGH, true) // Output goes HIGH when motion is detected
 {
 }
 

@@ -51,7 +51,7 @@ class FC51Sensor : public InterruptSensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline FC51Sensor::FC51Sensor(int pin)
-    : InterruptSensor("FC-51", pin, LOW) // Output goes LOW when an obstacle is detected
+    : InterruptSensor("FC-51", pin, LOW, true) // Output goes LOW when an obstacle is detected
 {
 }
 
