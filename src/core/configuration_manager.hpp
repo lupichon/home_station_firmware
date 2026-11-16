@@ -10,7 +10,8 @@
 #pragma once
 
 #include <Arduino.h>
-#include "storage.hpp"
+#include "storage/storage.hpp"
+#include "storage/keys.hpp"
 
 // ============================================================
 // Lecture d'une valeur hexadécimale
@@ -249,9 +250,9 @@ inline void checkConfigResetOnBoot(Storage& storage)
             if(cmd == "0")
             {
                 // Reset LoRaWAN-related keys
-                storage.remove(Storage::devEUIKey);
-                storage.remove(Storage::appEUIKey);
-                storage.remove(Storage::appKeyKey);
+                storage.remove(StorageKeys::devEUIKey);
+                storage.remove(StorageKeys::appEUIKey);
+                storage.remove(StorageKeys::appKeyKey);
 
                 Serial.println("LoRaWAN reset.");
             }
@@ -259,9 +260,9 @@ inline void checkConfigResetOnBoot(Storage& storage)
             else if(cmd == "1")
             {
                 // Reset Bluetooth-related keys
-                storage.remove(Storage::bleNameKey);
-                storage.remove(Storage::serviceUUIDKey);
-                storage.remove(Storage::characteristicUUIDKey);
+                storage.remove(StorageKeys::bleNameKey);
+                storage.remove(StorageKeys::serviceUUIDKey);
+                storage.remove(StorageKeys::characteristicUUIDKey);
 
                 Serial.println("Bluetooth reset.");
             }
@@ -269,8 +270,8 @@ inline void checkConfigResetOnBoot(Storage& storage)
             else if(cmd == "2")
             {
                 // Reset WiFi AP-related keys
-                storage.remove(Storage::wifiApSSIDKey);
-                storage.remove(Storage::wifiApPasswordKey);
+                storage.remove(StorageKeys::wifiApSSIDKey);
+                storage.remove(StorageKeys::wifiApPasswordKey);
 
                 Serial.println("WiFi AP reset.");
             }

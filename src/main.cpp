@@ -13,7 +13,8 @@
 #include "core/measurement.hpp"
 #include "core/status.hpp"
 #include "core/pins.hpp"
-#include "core/storage.hpp"
+#include "core/storage/storage.hpp"
+#include "core/storage/keys.hpp"
 #include "core/configuration_manager.hpp"
 #include "core/alarm_manager.hpp"
 #include "core/clock.hpp"
@@ -226,9 +227,9 @@ void setAlarmManagerCallbacks()
 {
     alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
     {
-        storage.begin(Storage::STORAGE_NAMESPACE, false);
-        storage.putBool(Storage::alarmArmedKey, armed);
-        storage.putUInt(Storage::alarmTargetKey, targetEpoch);
+        storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
+        storage.putBool(StorageKeys::alarmArmedKey, armed);
+        storage.putUInt(StorageKeys::alarmTargetKey, targetEpoch);
         storage.end();
 
         deviceConfig.alarmArmed       = armed;
@@ -260,95 +261,95 @@ void setWifiCallbacks()
 
    wifi.setOnConfigSaved([](const DeviceConfig& newDeviceConfig) 
    {
-        storage.begin(Storage::STORAGE_NAMESPACE, false);
+        storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
 
         if (memcmp(newDeviceConfig.devEui, deviceConfig.devEui, sizeof(newDeviceConfig.devEui)) != 0)
         {
-            storage.putBytes(Storage::devEUIKey, newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
+            storage.putBytes(StorageKeys::devEUIKey, newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
             memcpy(deviceConfig.devEui, newDeviceConfig.devEui, sizeof(deviceConfig.devEui));
         }
 
         if (memcmp(newDeviceConfig.appEui, deviceConfig.appEui, sizeof(newDeviceConfig.appEui)) != 0)
         {
-            storage.putBytes(Storage::appEUIKey, newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
+            storage.putBytes(StorageKeys::appEUIKey, newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
             memcpy(deviceConfig.appEui, newDeviceConfig.appEui, sizeof(deviceConfig.appEui));
         }
 
         if (memcmp(newDeviceConfig.appKey, deviceConfig.appKey, sizeof(newDeviceConfig.appKey)) != 0)
         {
-            storage.putBytes(Storage::appKeyKey, newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));   
+            storage.putBytes(StorageKeys::appKeyKey, newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));   
             memcpy(deviceConfig.appKey, newDeviceConfig.appKey, sizeof(deviceConfig.appKey));
         }
             
         if (newDeviceConfig.bleDeviceName != deviceConfig.bleDeviceName)
         {
-            storage.putString(Storage::bleNameKey, newDeviceConfig.bleDeviceName);
+            storage.putString(StorageKeys::bleNameKey, newDeviceConfig.bleDeviceName);
             deviceConfig.bleDeviceName = newDeviceConfig.bleDeviceName;
         }
 
         if (newDeviceConfig.serviceUUID != deviceConfig.serviceUUID)
         {
-            storage.putString(Storage::serviceUUIDKey, newDeviceConfig.serviceUUID);
+            storage.putString(StorageKeys::serviceUUIDKey, newDeviceConfig.serviceUUID);
             deviceConfig.serviceUUID = newDeviceConfig.serviceUUID;
         }
 
         if (newDeviceConfig.characteristicUUID != deviceConfig.characteristicUUID)
         {
-            storage.putString(Storage::characteristicUUIDKey, newDeviceConfig.characteristicUUID);
+            storage.putString(StorageKeys::characteristicUUIDKey, newDeviceConfig.characteristicUUID);
             deviceConfig.characteristicUUID = newDeviceConfig.characteristicUUID;
         }
 
         if (newDeviceConfig.timeSyncUUID != deviceConfig.timeSyncUUID)
         {
-            storage.putString(Storage::timeSyncUUIDKey, newDeviceConfig.timeSyncUUID);
+            storage.putString(StorageKeys::timeSyncUUIDKey, newDeviceConfig.timeSyncUUID);
             deviceConfig.timeSyncUUID = newDeviceConfig.timeSyncUUID;
         }
 
         if (newDeviceConfig.alarmTargetUUID != deviceConfig.alarmTargetUUID)
         {
-            storage.putString(Storage::alarmTargetUUIDKey, newDeviceConfig.alarmTargetUUID);
+            storage.putString(StorageKeys::alarmTargetUUIDKey, newDeviceConfig.alarmTargetUUID);
             deviceConfig.alarmTargetUUID = newDeviceConfig.alarmTargetUUID;
         }
 
         if (newDeviceConfig.doorStateUUID != deviceConfig.doorStateUUID)
         {
-            storage.putString(Storage::doorStateUUIDKey, newDeviceConfig.doorStateUUID);
+            storage.putString(StorageKeys::doorStateUUIDKey, newDeviceConfig.doorStateUUID);
             deviceConfig.doorStateUUID = newDeviceConfig.doorStateUUID;
         }
 
         if (newDeviceConfig.wifiApSSID != deviceConfig.wifiApSSID)
         {
-            storage.putString(Storage::wifiApSSIDKey, newDeviceConfig.wifiApSSID);
+            storage.putString(StorageKeys::wifiApSSIDKey, newDeviceConfig.wifiApSSID);
             deviceConfig.wifiApSSID = newDeviceConfig.wifiApSSID;
         }
 
         if (newDeviceConfig.wifiApPassword != deviceConfig.wifiApPassword)
         {
-            storage.putString(Storage::wifiApPasswordKey, newDeviceConfig.wifiApPassword);
+            storage.putString(StorageKeys::wifiApPasswordKey, newDeviceConfig.wifiApPassword);
             deviceConfig.wifiApPassword = newDeviceConfig.wifiApPassword;
         }
 
         if (newDeviceConfig.utcOffset != deviceConfig.utcOffset)
         {
-            storage.putChar(Storage::utcOffsetKey, newDeviceConfig.utcOffset);
+            storage.putChar(StorageKeys::utcOffsetKey, newDeviceConfig.utcOffset);
             deviceConfig.utcOffset = newDeviceConfig.utcOffset;
         }
 
         if (newDeviceConfig.altitudeM != deviceConfig.altitudeM)
         {
-            storage.putShort(Storage::altitudeKey, newDeviceConfig.altitudeM);
+            storage.putShort(StorageKeys::altitudeKey, newDeviceConfig.altitudeM);
             deviceConfig.altitudeM = newDeviceConfig.altitudeM;
         }
 
         if (newDeviceConfig.enabledSensorsMask != deviceConfig.enabledSensorsMask)
         {
-            storage.putUInt(Storage::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
+            storage.putUInt(StorageKeys::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
             deviceConfig.enabledSensorsMask = newDeviceConfig.enabledSensorsMask;
         }
 
         if (newDeviceConfig.enabledCommsMask != deviceConfig.enabledCommsMask)
         {
-            storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
+            storage.putUInt(StorageKeys::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
             deviceConfig.enabledCommsMask = newDeviceConfig.enabledCommsMask;
         }
     
@@ -656,29 +657,29 @@ void initInterface()
 // Initialize storage and load or create device configuration
 void initStorage()
 {
-    storage.begin(Storage::STORAGE_NAMESPACE, false);
+    storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
     checkConfigResetOnBoot(storage);
 
-    loadOrCreateConfig(storage, Storage::devEUIKey,              "Dev EUI",                          deviceConfig.devEui,            sizeof(deviceConfig.devEui));
-    loadOrCreateConfig(storage, Storage::appEUIKey,              "App EUI",                          deviceConfig.appEui,            sizeof(deviceConfig.appEui));
-    loadOrCreateConfig(storage, Storage::appKeyKey,              "App Key",                          deviceConfig.appKey,            sizeof(deviceConfig.appKey));
-    loadOrCreateConfig(storage, Storage::bleNameKey,             "BLE Device Name",                  deviceConfig.bleDeviceName,     31, false);
-    loadOrCreateConfig(storage, Storage::serviceUUIDKey,         "Service UUID",                     deviceConfig.serviceUUID,       36);
-    loadOrCreateConfig(storage, Storage::characteristicUUIDKey,  "Characteristic UUID",              deviceConfig.characteristicUUID,36);
-    loadOrCreateConfig(storage, Storage::timeSyncUUIDKey,        "Time Sync Characteristic UUID",    deviceConfig.timeSyncUUID,      36);
-    loadOrCreateConfig(storage, Storage::alarmTargetUUIDKey,     "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID,   36);
-    loadOrCreateConfig(storage, Storage::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
-    loadOrCreateConfig(storage, Storage::doorStateUUIDKey,       "Door State Characteristic UUID",   deviceConfig.doorStateUUID,     36);
-    loadOrCreateConfig(storage, Storage::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
-    loadOrCreateConfig(storage, Storage::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
-    loadOrCreateConfig(storage, Storage::aesKeyKey,              "AES Key",                          deviceConfig.aesKey,            sizeof(deviceConfig.aesKey));
+    loadOrCreateConfig(storage, StorageKeys::devEUIKey,              "Dev EUI",                          deviceConfig.devEui,            sizeof(deviceConfig.devEui));
+    loadOrCreateConfig(storage, StorageKeys::appEUIKey,              "App EUI",                          deviceConfig.appEui,            sizeof(deviceConfig.appEui));
+    loadOrCreateConfig(storage, StorageKeys::appKeyKey,              "App Key",                          deviceConfig.appKey,            sizeof(deviceConfig.appKey));
+    loadOrCreateConfig(storage, StorageKeys::bleNameKey,             "BLE Device Name",                  deviceConfig.bleDeviceName,     31, false);
+    loadOrCreateConfig(storage, StorageKeys::serviceUUIDKey,         "Service UUID",                     deviceConfig.serviceUUID,       36);
+    loadOrCreateConfig(storage, StorageKeys::characteristicUUIDKey,  "Characteristic UUID",              deviceConfig.characteristicUUID,36);
+    loadOrCreateConfig(storage, StorageKeys::timeSyncUUIDKey,        "Time Sync Characteristic UUID",    deviceConfig.timeSyncUUID,      36);
+    loadOrCreateConfig(storage, StorageKeys::alarmTargetUUIDKey,     "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID,   36);
+    loadOrCreateConfig(storage, StorageKeys::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
+    loadOrCreateConfig(storage, StorageKeys::doorStateUUIDKey,       "Door State Characteristic UUID",   deviceConfig.doorStateUUID,     36);
+    loadOrCreateConfig(storage, StorageKeys::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
+    loadOrCreateConfig(storage, StorageKeys::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
+    loadOrCreateConfig(storage, StorageKeys::aesKeyKey,              "AES Key",                          deviceConfig.aesKey,            sizeof(deviceConfig.aesKey));
 
-    deviceConfig.alarmArmed         = storage.getBool(Storage::alarmArmedKey,  false);
-    deviceConfig.alarmTargetEpoch   = storage.getUInt(Storage::alarmTargetKey, 0);
-    deviceConfig.utcOffset          = storage.getChar(Storage::utcOffsetKey,   0);
-    deviceConfig.altitudeM          = storage.getShort(Storage::altitudeKey,   0);
-    deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(Storage::enabledSensorsMaskKey, 0xFFFF));
-    deviceConfig.enabledCommsMask   = static_cast<uint8_t>(storage.getUInt(Storage::enabledCommsMaskKey, 0x07));
+    deviceConfig.alarmArmed         = storage.getBool(StorageKeys::alarmArmedKey,  false);
+    deviceConfig.alarmTargetEpoch   = storage.getUInt(StorageKeys::alarmTargetKey, 0);
+    deviceConfig.utcOffset          = storage.getChar(StorageKeys::utcOffsetKey,   0);
+    deviceConfig.altitudeM          = storage.getShort(StorageKeys::altitudeKey,   0);
+    deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(StorageKeys::enabledSensorsMaskKey, 0xFFFF));
+    deviceConfig.enabledCommsMask   = static_cast<uint8_t>(storage.getUInt(StorageKeys::enabledCommsMaskKey, 0x07));
 
     storage.end();
 }
@@ -888,8 +889,8 @@ void handleButton()
             setWifiCallbacks();
             wifi.begin();
             deviceConfig.enabledCommsMask |= static_cast<uint8_t>(CommsBit::WIFI_BIT);
-            storage.begin(Storage::STORAGE_NAMESPACE, false);
-            storage.putUInt(Storage::enabledCommsMaskKey, static_cast<uint32_t>(deviceConfig.enabledCommsMask));
+            storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
+            storage.putUInt(StorageKeys::enabledCommsMaskKey, static_cast<uint32_t>(deviceConfig.enabledCommsMask));
             storage.end();
 
             #if DEBUG_ENABLE
