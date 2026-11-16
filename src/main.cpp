@@ -1146,7 +1146,7 @@ void printDebugInfo()
     Serial.print("wifiControlUUID: ");    Serial.println(deviceConfig.wifiControlUUID);
     Serial.print("enabledSensorsMask: "); Serial.println(deviceConfig.enabledSensorsMask, BIN);
     Serial.print("enabledCommsMask: ");   Serial.println(deviceConfig.enabledCommsMask, BIN);
-    Serial.print("altitude: ");           Serial.println(deviceConfig.altitude);
+    Serial.print("altitude: ");           Serial.println(deviceConfig.altitudeM);
 
     Serial.println("--- LoRaWAN Region ---");  
     #if defined(CFG_eu868)
@@ -1227,7 +1227,7 @@ void loop()
         handleBluetooth();
     }
 
-    // Task executed every 10000 ms: accumulate measurements for the LoRaWAN uplink
+    // Task executed every 60000 ms
     if (now - last60000Ms >= TASK_60000_MS)
     {
         last60000Ms = now;
