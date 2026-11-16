@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../core/measurement.hpp"
+#include "../model/measurement.hpp"
 
 // ============================================================
 // Buffer layout constants

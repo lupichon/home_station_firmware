@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 #include "../interface.hpp"
-#include "../../../core/measurement.hpp"
-#include "../../../core/clock.hpp"
+#include "../../../model/measurement.hpp"
+#include "../../../platform/clock.hpp"
 
 /**
  * @brief Draws the startup screen and pages into a screen driver's buffer.

@@ -5,10 +5,6 @@
  * @date    2026-07-29
  */
 
-// !!!!!!!!!!!!!!!!!! WARNING !!!!!!!!!!!!!!!!!
-// To configure the correct frequency for your region, you need to modify the project_config/lmic_project_config.h file.
-// (./Arduino/libraries/MCCI_LoRaWAN_LMIC_library/project_config/lmic_project_config.h)
-
 #pragma once
 
 #include <Arduino.h>
@@ -33,19 +29,11 @@ extern "C"
 class LoRaWANCommunication : public Communication
 {
     public:
-        using JoinedCallback        = void (*)();
-        using DownlinkCallback      = void (*)(uint8_t port, const uint8_t* data, uint8_t length);
-        using PayloadBuilder        = uint8_t (*)(uint8_t* buffer, uint8_t maxLength);
-        using TxCompleteCallback    = void (*)(bool hasDownlink);
-        using JoinFailedCallback    = void (*)();
-        using RejoinFailedCallback  = void (*)();
-        using LinkDeadCallback      = void (*)();
-        using LinkAliveCallback     = void (*)();
-        using RxStartCallback       = void (*)();
-        using JoiningCallback       = void (*)();
-        using BeforeUplinkCallback  = void (*)();
-        using TxStartCallback       = void (*)();
-        using AutoUplinkResultCallback = void (*)(bool acked);
+        using EventCallback            = std::function<void()>;
+        using TxCompleteCallback       = std::function<void(bool hasDownlink)>;
+        using AutoUplinkResultCallback = std::function<void(bool acked)>;
+        using DownlinkCallback         = std::function<void(uint8_t port, const uint8_t* data, uint8_t length)>;
+        using PayloadBuilder           = std::function<uint8_t(uint8_t* buffer, uint8_t maxLength)>;
 
         /**
          * @brief Constructor for LoRaWANCommunication.
@@ -127,16 +115,16 @@ class LoRaWANCommunication : public Communication
         void setLastLoRaTwMs(unsigned long timestamp);
 
         // Callback setters for various LoRaWAN events
-        void onJoined       (JoinedCallback       cb) { joinedCb        = cb; } // Callback for when the device successfully joins the LoRaWAN network
+        void onJoined       (EventCallback        cb) { joinedCb        = cb; } // Callback for when the device successfully joins the LoRaWAN network
         void onDownlink     (DownlinkCallback     cb) { downlinkCb      = cb; } // Callback for when a downlink message is received
         void onTxComplete   (TxCompleteCallback   cb) { txCompleteCb    = cb; } // Callback for when a transmission is complete (with or without downlink)
-        void onJoinFailed   (JoinFailedCallback   cb) { joinFailedCb    = cb; } // Callback for when the join process fails
-        void onRejoinFailed (RejoinFailedCallback cb) { rejoinFailedCb  = cb; } // Callback for when a rejoin attempt fails
-        void onLinkDead     (LinkDeadCallback     cb) { linkDeadCb      = cb; } // Callback for when the LoRaWAN link is considered dead (no downlink received for a while)
-        void onLinkAlive    (LinkAliveCallback    cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
-        void onRxStart      (RxStartCallback      cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
-        void onJoining      (JoiningCallback      cb) { joiningCb       = cb; } // Callback for when the device starts the join
-        void onTxStart      (TxStartCallback      cb) { txStartCb       = cb; } // Callback for when a transmission starts
+        void onJoinFailed   (EventCallback        cb) { joinFailedCb    = cb; } // Callback for when the join process fails
+        void onRejoinFailed (EventCallback        cb) { rejoinFailedCb  = cb; } // Callback for when a rejoin attempt fails
+        void onLinkDead     (EventCallback        cb) { linkDeadCb      = cb; } // Callback for when the LoRaWAN link is considered dead (no downlink received for a while)
+        void onLinkAlive    (EventCallback        cb) { linkAliveCb     = cb; } // Callback for when the LoRaWAN link is considered alive (downlink received after being dead)
+        void onRxStart      (EventCallback        cb) { rxStartCb       = cb; } // Callback for when a downlink reception starts (DIO0 goes high)
+        void onJoining      (EventCallback        cb) { joiningCb       = cb; } // Callback for when the device starts the join
+        void onTxStart      (EventCallback        cb) { txStartCb       = cb; } // Callback for when a transmission starts
         void onAutoUplinkResult(AutoUplinkResultCallback cb) { autoUplinkResultCb = cb; } // Callback with the ACK status of each automatic (confirmed) uplink
 
     private:
@@ -159,16 +147,16 @@ class LoRaWANCommunication : public Communication
         unsigned long lastLoRaTwMs = 0;  // Timestamp of the last LoRaWAN transmission in milliseconds
 
         // Callback function pointers for various LoRaWAN events
-        JoinedCallback       joinedCb        = nullptr; 
+        EventCallback        joinedCb        = nullptr; 
         DownlinkCallback     downlinkCb      = nullptr;
         TxCompleteCallback   txCompleteCb    = nullptr;
-        JoinFailedCallback   joinFailedCb    = nullptr;
-        RejoinFailedCallback rejoinFailedCb  = nullptr;
-        LinkDeadCallback     linkDeadCb      = nullptr;
-        RxStartCallback      rxStartCb       = nullptr;
-        JoiningCallback      joiningCb       = nullptr;
-        LinkAliveCallback    linkAliveCb     = nullptr;
-        TxStartCallback       txStartCb      = nullptr;
+        EventCallback   joinFailedCb    = nullptr;
+        EventCallback rejoinFailedCb  = nullptr;
+        EventCallback     linkDeadCb      = nullptr;
+        EventCallback      rxStartCb       = nullptr;
+        EventCallback      joiningCb       = nullptr;
+        EventCallback    linkAliveCb     = nullptr;
+        EventCallback       txStartCb      = nullptr;
         AutoUplinkResultCallback autoUplinkResultCb = nullptr;
 
         osjob_t sendjob;    // Job structure for scheduling automatic uplink transmissions
@@ -222,37 +210,6 @@ class LoRaWANCommunication : public Communication
 // ============================================================
 
 inline LoRaWANCommunication* lorawanPtr = nullptr;    // Pointer to the LoRaWANCommunication instance for LMIC callbacks
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Credentials configuration
-// ─────────────────────────────────────────────────────────────────────────────
-extern "C"
-{
-    void os_getDevEui(u1_t* buf)
-    {
-        for (int i = 0; i < 8; i++)
-            buf[i] = lorawanPtr->devEui[7 - i];
-    }
-
-
-    void os_getArtEui(u1_t* buf)
-    {
-        for (int i = 0; i < 8; i++)
-            buf[i] = lorawanPtr->appEui[7 - i];
-    }
-
-
-    void os_getDevKey(u1_t* buf)
-    {
-        memcpy(buf, lorawanPtr->appKey, 16);
-    }
-
-
-    void onEvent(ev_t event)
-    {
-        lorawanPtr->handleEvent(event);
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constructor

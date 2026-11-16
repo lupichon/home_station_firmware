@@ -11,8 +11,8 @@
 #include <Arduino.h>
 
 #include "layout/layout.hpp"
-#include "../../core/measurement.hpp"
-#include "../../core/clock.hpp"
+#include "../../model/measurement.hpp"
+#include "../../platform/clock.hpp"
 
 // ============================================================
 // ScreenController class definition

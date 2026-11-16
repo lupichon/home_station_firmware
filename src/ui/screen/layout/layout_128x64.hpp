@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 #include "layout.hpp"
-#include "../../../core/firmware_version.hpp"
+#include "../../../../include/firmware_version.hpp"
 
 class Layout128x64 : public ScreenLayout
 {

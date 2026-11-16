@@ -16,7 +16,7 @@ import re
 
 Import("env")
 
-HEADER_PATH = os.path.join("src", "core", "firmware_version.hpp")
+HEADER_PATH = os.path.join("include", "firmware_version.hpp")
 
 
 def read_existing_version():

@@ -12,8 +12,8 @@
 
 #include "device_config.hpp"
 #include "defaults.hpp"
-#include "../storage/storage.hpp"
-#include "../storage/keys.hpp"
+#include "../platform/storage/storage.hpp"
+#include "../platform/storage/keys.hpp"
 
 
 // ============================================================

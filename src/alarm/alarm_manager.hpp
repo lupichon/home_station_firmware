@@ -11,8 +11,8 @@
 #include <Arduino.h>
 #include <functional>
 
-#include "../core/clock.hpp"
-#include "../interface/buzzer.hpp"
+#include "../platform/clock.hpp"
+#include "../ui/buzzer.hpp"
 
 // ============================================================
 // AlarmManager class definition

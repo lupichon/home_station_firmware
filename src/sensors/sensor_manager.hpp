@@ -155,7 +155,7 @@ inline const Sensor& SensorManager::at(size_t index) const
 
 inline bool SensorManager::isEnabled(size_t index, uint16_t enabledMask) const
 {
-    return isSensorEnabled(enabledMask, sensors[index]->bit());
+    return isSensorEnabled(enabledMask, sensors[index]->getBit());
 }
 
 inline bool SensorManager::lastReadSucceeded(size_t index) const

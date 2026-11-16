@@ -9,7 +9,7 @@ import re
 
 Import("env")
 
-VERSION_HEADER_PATH = os.path.join("src", "core", "firmware_version.hpp")
+VERSION_HEADER_PATH = os.path.join("include", "firmware_version.hpp")
 OUTPUT_DIR = "firmwares"
 
 

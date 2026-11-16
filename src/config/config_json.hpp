@@ -11,7 +11,7 @@
 #include <ArduinoJson.h>
 
 #include "device_config.hpp"
-#include "../../utils/hex.hpp"
+#include "../utils/hex.hpp"
 
 /**
  * @brief Write every field of a configuration into a JSON document.

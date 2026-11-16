@@ -8,8 +8,8 @@
 #pragma once
 
 #include <stdio.h>
-#include "../core/measurement.hpp"
-#include "../core/sensors_bit.hpp"
+#include "sensors_bit.hpp"
+#include "../model/measurement.hpp"
 
 
 // ============================================================
@@ -59,8 +59,9 @@ class Sensor
 
         /**
          * @brief Get the bit of this sensor in the enabled-sensors mask.
+         * @return The bit corresponding to this sensor.
          */
-        SensorsBit bit() const;
+        SensorsBit getBit() const;
 
         /**
          * @brief Check whether the sensor has been initialized.
@@ -121,7 +122,7 @@ inline const char* Sensor::getUnit() const
     return unit;
 }
 
-inline SensorsBit Sensor::bit() const
+inline SensorsBit Sensor::getBit() const
 {
     return sensorBit;
 }

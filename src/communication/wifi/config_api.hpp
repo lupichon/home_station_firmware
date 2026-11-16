@@ -12,9 +12,9 @@
 #include <WebServer.h>
 #include <functional>
 
-#include "../../core/configuration/device_config.hpp"
-#include "../../core/configuration/config_json.hpp"
-#include "../../core/firmware_version.hpp"
+#include "../../config/device_config.hpp"
+#include "../../config/config_json.hpp"
+#include "../../../include/firmware_version.hpp"
 
 
 // ============================================================
