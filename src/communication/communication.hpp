@@ -18,15 +18,11 @@ class Communication
 {
     // ── Protected members ─────────────────────────────────────────────────
     protected:
-        bool initialized = false;               // True if the communication interface has been successfully initialized
-        static inline int  communicationCount;  // Number of Communication instances created
+        bool initialized = false;   // True if the communication interface has been successfully initialized
 
     // ── Public interface ──────────────────────────────────────────────────
     public:
-        /**
-         * @brief Constructor for Communication.
-         */
-        Communication();
+        virtual ~Communication() = default;
 
         /**
          * @brief Initialize the communication interface.
@@ -35,47 +31,31 @@ class Communication
         virtual bool begin() = 0;
 
         /**
-         * @brief Send data over the communication interface.
+         * @brief Run the periodic work of the interface. Does nothing by default.
+         */
+        virtual void loop() {}
+
+        /**
+         * @brief Stop the interface. Does nothing by default.
+         */
+        virtual void stop() {}
+
+        /**
+         * @brief Send data over the interface. Fails by default, for interfaces that do not send.
          * @param data Pointer to the data buffer.
          * @param size Size of the data to send in bytes.
          * @return true if data was sent successfully, false otherwise.
          */
-        virtual bool send(uint8_t* data, size_t size) = 0;
+        virtual bool send(uint8_t* data, size_t size) { return false; }
+
+        /**
+         * @brief Check if a peer is connected. False by default.
+         */
+        virtual bool hasConnectedClient() const { return false; }
 
         /**
          * @brief Check if the communication interface has been initialized.
          * @return true if initialized, false otherwise.
          */
-        bool isInitialized() const;
-
-        /**
-         * @brief Get the total number of Communication instances created.
-         * @return Number of Communication instances.
-         */
-        static int getCommunicationCount();
-
-        /**
-         * @brief Destructor for Communication.
-         */
-        virtual ~Communication() = default;
+        bool isInitialized() const { return initialized; }
 };
-
-// ============================================================
-// Implementations
-// ============================================================
-
-inline Communication::Communication()
-    : initialized(false)
-{
-    communicationCount++;
-}
-
-inline bool Communication::isInitialized() const
-{
-    return initialized;
-}
-
-inline int Communication::getCommunicationCount()
-{
-    return communicationCount;
-}

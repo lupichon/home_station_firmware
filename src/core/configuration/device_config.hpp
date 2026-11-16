@@ -46,10 +46,10 @@ struct DeviceConfig
     String wifiApPassword;   // Password of the WiFi access point
 
     // ── Sensors ──────────────────────────────────────────────────────────
-    uint16_t enabledSensorsMask = 0x0000;   // Bitmask of enabled sensors (all enabled by default)
+    uint16_t enabledSensorsMask = 0x0000;   // Bitmask of enabled sensors (see SensorsBit)
 
     // ── Communication ────────────────────────────────────────────────────
-    uint8_t enabledCommsMask = 0x00; // Bitmask of enabled communication interfaces (bit 0: LoRaWAN, bit 1: Bluetooth, bit 2: WiFi AP)
+    uint8_t enabledCommsMask = 0x00; // Bitmask of enabled communication interfaces (see CommsBit)
 
     // ── Location ─────────────────────────────────────────────────────────
     int16_t altitudeM = 0;   // Altitude in meters, used to convert pressure to sea level

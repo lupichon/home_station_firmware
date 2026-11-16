@@ -14,11 +14,10 @@
 #include "core/status.hpp"
 #include "core/pins.hpp"
 #include "core/storage/storage.hpp"
-#include "core/storage/keys.hpp"
-#include "core/configuration_manager.hpp"
 #include "core/alarm_manager.hpp"
 #include "core/clock.hpp"
-#include "core/device_config.hpp"
+#include "core/configuration/device_config.hpp"
+#include "core/configuration/config_manager.hpp"
 #include "core/data_serializer.hpp"
 #include "core/crypto.hpp"
 #include "core/firmware_version.hpp"
@@ -39,6 +38,8 @@
 // ==================== Communication ====================
 #include "communication/bluetooth/bluetooth.hpp"
 #include "communication/wifi/wifi.hpp"
+#include "communication/wifi/config_api.hpp"
+#include "communication/wifi/update_api.hpp"
 #include "communication/LoRaWAN/lorawan.hpp"
 
 // ==================== Interface ====================
@@ -99,13 +100,6 @@ BluetoothCommunication bluetooth;
 WiFiCommunication      wifi;
 LoRaWANCommunication   lorawan;
 
-Communication* communications[] =
-{
-    &bluetooth,
-    &wifi,
-    &lorawan
-};
-
 // ==================== Sensors ====================
 BH1750Sensor  lightSensor;                        // Luminosity
 HCSR501Sensor motionSensor(HC_SR501_PIN);         // Motion
@@ -139,6 +133,9 @@ Measurement     measurement;
 MeasurementAccumulator accumulator;
 Status          status;
 DeviceConfig    deviceConfig;
+ConfigManager   configManager(storage, deviceConfig);
+ConfigApi       configApi(deviceConfig);
+UpdateApi       updateApi;
 
 uint8_t buffer[BUFFER_SIZE];
 size_t  dataSize = 0;
@@ -159,11 +156,6 @@ unsigned long last60000Ms= 0;
 
 constexpr unsigned long lorawanAutoUplinkInterval_S = 600;
 constexpr unsigned long lorawanFirstUplinkUptime_S  = 1800;
-
-// ==================== Counts ====================
-int commCount   = Communication::getCommunicationCount();
-
-constexpr size_t COMM_COUNT   = sizeof(communications) / sizeof(communications[0]);
 
 // ============== Utility functions ====================
 
@@ -222,19 +214,20 @@ bool isLiveDataRequested()
 
 // =================== Callback Setup Functions ====================
 
-// Set up the callback for the alarm manager to save changes to storage and update the device configuration
+unsigned long rebootAtMs = 0;  // millis() at which to restart, 0 when no restart is pending
+
+// Restart after a delay, so that the HTTP response has time to be sent
+void scheduleReboot(unsigned long delayMs)
+{
+    rebootAtMs = millis() + delayMs;
+}
+
+// Set up the callback for the alarm manager to persist changes
 void setAlarmManagerCallbacks()
 {
     alarmManager.onAlarmChanged([](bool armed, uint32_t targetEpoch)
     {
-        storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
-        storage.putBool(StorageKeys::alarmArmedKey, armed);
-        storage.putUInt(StorageKeys::alarmTargetKey, targetEpoch);
-        storage.end();
-
-        deviceConfig.alarmArmed       = armed;
-        deviceConfig.alarmTargetEpoch = targetEpoch;
-        
+        configManager.saveAlarm(armed, targetEpoch);
         #if DEBUG_ENABLE
         Serial.println("Alarm changed: armed=" + String(armed) + ", targetEpoch=" + String(targetEpoch));
         #endif
@@ -244,8 +237,6 @@ void setAlarmManagerCallbacks()
 // Set up the callbacks for WiFi communication to handle configuration saving and sensor information requests
 void setWifiCallbacks()
 {
-    wifi.setConfigTarget(&deviceConfig);
-
     wifi.setSensorInfoProvider([]() -> String
     {
         String json = "[";
@@ -259,106 +250,20 @@ void setWifiCallbacks()
     });
 
 
-   wifi.setOnConfigSaved([](const DeviceConfig& newDeviceConfig) 
-   {
-        storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
-
-        if (memcmp(newDeviceConfig.devEui, deviceConfig.devEui, sizeof(newDeviceConfig.devEui)) != 0)
-        {
-            storage.putBytes(StorageKeys::devEUIKey, newDeviceConfig.devEui, sizeof(newDeviceConfig.devEui));
-            memcpy(deviceConfig.devEui, newDeviceConfig.devEui, sizeof(deviceConfig.devEui));
-        }
-
-        if (memcmp(newDeviceConfig.appEui, deviceConfig.appEui, sizeof(newDeviceConfig.appEui)) != 0)
-        {
-            storage.putBytes(StorageKeys::appEUIKey, newDeviceConfig.appEui, sizeof(newDeviceConfig.appEui));
-            memcpy(deviceConfig.appEui, newDeviceConfig.appEui, sizeof(deviceConfig.appEui));
-        }
-
-        if (memcmp(newDeviceConfig.appKey, deviceConfig.appKey, sizeof(newDeviceConfig.appKey)) != 0)
-        {
-            storage.putBytes(StorageKeys::appKeyKey, newDeviceConfig.appKey, sizeof(newDeviceConfig.appKey));   
-            memcpy(deviceConfig.appKey, newDeviceConfig.appKey, sizeof(deviceConfig.appKey));
-        }
-            
-        if (newDeviceConfig.bleDeviceName != deviceConfig.bleDeviceName)
-        {
-            storage.putString(StorageKeys::bleNameKey, newDeviceConfig.bleDeviceName);
-            deviceConfig.bleDeviceName = newDeviceConfig.bleDeviceName;
-        }
-
-        if (newDeviceConfig.serviceUUID != deviceConfig.serviceUUID)
-        {
-            storage.putString(StorageKeys::serviceUUIDKey, newDeviceConfig.serviceUUID);
-            deviceConfig.serviceUUID = newDeviceConfig.serviceUUID;
-        }
-
-        if (newDeviceConfig.characteristicUUID != deviceConfig.characteristicUUID)
-        {
-            storage.putString(StorageKeys::characteristicUUIDKey, newDeviceConfig.characteristicUUID);
-            deviceConfig.characteristicUUID = newDeviceConfig.characteristicUUID;
-        }
-
-        if (newDeviceConfig.timeSyncUUID != deviceConfig.timeSyncUUID)
-        {
-            storage.putString(StorageKeys::timeSyncUUIDKey, newDeviceConfig.timeSyncUUID);
-            deviceConfig.timeSyncUUID = newDeviceConfig.timeSyncUUID;
-        }
-
-        if (newDeviceConfig.alarmTargetUUID != deviceConfig.alarmTargetUUID)
-        {
-            storage.putString(StorageKeys::alarmTargetUUIDKey, newDeviceConfig.alarmTargetUUID);
-            deviceConfig.alarmTargetUUID = newDeviceConfig.alarmTargetUUID;
-        }
-
-        if (newDeviceConfig.doorStateUUID != deviceConfig.doorStateUUID)
-        {
-            storage.putString(StorageKeys::doorStateUUIDKey, newDeviceConfig.doorStateUUID);
-            deviceConfig.doorStateUUID = newDeviceConfig.doorStateUUID;
-        }
-
-        if (newDeviceConfig.wifiApSSID != deviceConfig.wifiApSSID)
-        {
-            storage.putString(StorageKeys::wifiApSSIDKey, newDeviceConfig.wifiApSSID);
-            deviceConfig.wifiApSSID = newDeviceConfig.wifiApSSID;
-        }
-
-        if (newDeviceConfig.wifiApPassword != deviceConfig.wifiApPassword)
-        {
-            storage.putString(StorageKeys::wifiApPasswordKey, newDeviceConfig.wifiApPassword);
-            deviceConfig.wifiApPassword = newDeviceConfig.wifiApPassword;
-        }
-
-        if (newDeviceConfig.utcOffset != deviceConfig.utcOffset)
-        {
-            storage.putChar(StorageKeys::utcOffsetKey, newDeviceConfig.utcOffset);
-            deviceConfig.utcOffset = newDeviceConfig.utcOffset;
-        }
-
-        if (newDeviceConfig.altitudeM != deviceConfig.altitudeM)
-        {
-            storage.putShort(StorageKeys::altitudeKey, newDeviceConfig.altitudeM);
-            deviceConfig.altitudeM = newDeviceConfig.altitudeM;
-        }
-
-        if (newDeviceConfig.enabledSensorsMask != deviceConfig.enabledSensorsMask)
-        {
-            storage.putUInt(StorageKeys::enabledSensorsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledSensorsMask));
-            deviceConfig.enabledSensorsMask = newDeviceConfig.enabledSensorsMask;
-        }
-
-        if (newDeviceConfig.enabledCommsMask != deviceConfig.enabledCommsMask)
-        {
-            storage.putUInt(StorageKeys::enabledCommsMaskKey, static_cast<uint32_t>(newDeviceConfig.enabledCommsMask));
-            deviceConfig.enabledCommsMask = newDeviceConfig.enabledCommsMask;
-        }
-    
-        storage.end();
+    configApi.setOnSaved([](const DeviceConfig& newDeviceConfig)
+    {
+        configManager.save(newDeviceConfig);
+        scheduleReboot(300);
 
         #if DEBUG_ENABLE
         Serial.println("Device configuration updated.");
         #endif
     });
+
+    updateApi.setOnFinished([]() { scheduleReboot(500); });
+
+    wifi.addRoutes([](WebServer& server) { configApi.install(server); });
+    wifi.addRoutes([](WebServer& server) { updateApi.install(server); });
 
     wifi.setMeasurementProvider([]() -> String
     {
@@ -654,34 +559,10 @@ void initInterface()
     buzzer.begin();
 }
 
-// Initialize storage and load or create device configuration
-void initStorage()
+// Load the device configuration from storage (defaults for missing entries)
+void initConfig()
 {
-    storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
-    checkConfigResetOnBoot(storage);
-
-    loadOrCreateConfig(storage, StorageKeys::devEUIKey,              "Dev EUI",                          deviceConfig.devEui,            sizeof(deviceConfig.devEui));
-    loadOrCreateConfig(storage, StorageKeys::appEUIKey,              "App EUI",                          deviceConfig.appEui,            sizeof(deviceConfig.appEui));
-    loadOrCreateConfig(storage, StorageKeys::appKeyKey,              "App Key",                          deviceConfig.appKey,            sizeof(deviceConfig.appKey));
-    loadOrCreateConfig(storage, StorageKeys::bleNameKey,             "BLE Device Name",                  deviceConfig.bleDeviceName,     31, false);
-    loadOrCreateConfig(storage, StorageKeys::serviceUUIDKey,         "Service UUID",                     deviceConfig.serviceUUID,       36);
-    loadOrCreateConfig(storage, StorageKeys::characteristicUUIDKey,  "Characteristic UUID",              deviceConfig.characteristicUUID,36);
-    loadOrCreateConfig(storage, StorageKeys::timeSyncUUIDKey,        "Time Sync Characteristic UUID",    deviceConfig.timeSyncUUID,      36);
-    loadOrCreateConfig(storage, StorageKeys::alarmTargetUUIDKey,     "Alarm Target Characteristic UUID", deviceConfig.alarmTargetUUID,   36);
-    loadOrCreateConfig(storage, StorageKeys::wifiControlUUIDKey,     "WiFi Control Characteristic UUID", deviceConfig.wifiControlUUID,   36);
-    loadOrCreateConfig(storage, StorageKeys::doorStateUUIDKey,       "Door State Characteristic UUID",   deviceConfig.doorStateUUID,     36);
-    loadOrCreateConfig(storage, StorageKeys::wifiApSSIDKey,          "WiFi AP SSID",                     deviceConfig.wifiApSSID,        32, false);
-    loadOrCreateConfig(storage, StorageKeys::wifiApPasswordKey,      "WiFi AP Password",                 deviceConfig.wifiApPassword,    64, false);
-    loadOrCreateConfig(storage, StorageKeys::aesKeyKey,              "AES Key",                          deviceConfig.aesKey,            sizeof(deviceConfig.aesKey));
-
-    deviceConfig.alarmArmed         = storage.getBool(StorageKeys::alarmArmedKey,  false);
-    deviceConfig.alarmTargetEpoch   = storage.getUInt(StorageKeys::alarmTargetKey, 0);
-    deviceConfig.utcOffset          = storage.getChar(StorageKeys::utcOffsetKey,   0);
-    deviceConfig.altitudeM          = storage.getShort(StorageKeys::altitudeKey,   0);
-    deviceConfig.enabledSensorsMask = static_cast<uint16_t>(storage.getUInt(StorageKeys::enabledSensorsMaskKey, 0xFFFF));
-    deviceConfig.enabledCommsMask   = static_cast<uint8_t>(storage.getUInt(StorageKeys::enabledCommsMaskKey, 0x07));
-
-    storage.end();
+    configManager.load();
 }
 
 // Initialize system clock with UTC offset from device configuration
@@ -888,10 +769,7 @@ void handleButton()
             wifi.configure(deviceConfig.wifiApSSID,deviceConfig.wifiApPassword);
             setWifiCallbacks();
             wifi.begin();
-            deviceConfig.enabledCommsMask |= static_cast<uint8_t>(CommsBit::WIFI_BIT);
-            storage.begin(StorageKeys::STORAGE_NAMESPACE, false);
-            storage.putUInt(StorageKeys::enabledCommsMaskKey, static_cast<uint32_t>(deviceConfig.enabledCommsMask));
-            storage.end();
+            configManager.saveCommsMask(deviceConfig.enabledCommsMask | static_cast<uint8_t>(CommsBit::WIFI_BIT));
 
             #if DEBUG_ENABLE
             Serial.println("WiFi started");
@@ -994,6 +872,15 @@ void handleWatchdog()
     esp_task_wdt_reset();
 }
 
+// Restart the device once a scheduled reboot is due
+void handleReboot()
+{
+    if (rebootAtMs != 0 && millis() >= rebootAtMs)
+    {
+        ESP.restart();
+    }
+}
+
 #if DEBUG_ENABLE
 // =================== Debug Functions ====================
 void printDebugInfo()
@@ -1071,10 +958,10 @@ void printDebugInfo()
 // ==================== Setup and Loop ====================
 void setup()
 {
+    initWatchdog();
     initInterface();
     initSerial();
-    initStorage();
-    initWatchdog();
+    initConfig();
     initClock();
     initAlarmManager();
     initCommunication();
@@ -1094,6 +981,7 @@ void loop()
 
     // Task executed every iteration
     handleWatchdog();
+    handleReboot();
     handleLoRaWAN();
     handleWifi();
     handleSensorsUpdate();

@@ -82,7 +82,7 @@ class LoRaWANCommunication : public Communication
         /**
          * @brief Main loop to handle LoRaWAN events and automatic uplink transmissions.
          */
-        void loop();
+        void loop() override;
 
         /**
          * @brief Send an uplink message over LoRaWAN.
