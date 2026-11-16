@@ -1,5 +1,5 @@
 /**
- * @file    screen_interface.hpp
+ * @file    interface.hpp
  * @brief   Interface for screen drivers used by the HomeStation display controller.
  * @author  Lucas Pichon
  * @date    2026-11-12

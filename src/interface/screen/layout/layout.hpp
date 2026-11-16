@@ -1,5 +1,5 @@
 /**
- * @file    screen_layout.hpp
+ * @file    layout.hpp
  * @brief   Page selection and rendering interface for screen layouts.
  * @author  Lucas Pichon
  * @date    2026-11-12
@@ -10,7 +10,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 
-#include "../screen_interface.hpp"
+#include "../interface.hpp"
 #include "../../../core/measurement.hpp"
 #include "../../../core/clock.hpp"
 

@@ -1,14 +1,15 @@
 /**
- * @file    driver_MAX9814.hpp
- * @brief   MAX9814 analog microphone sensor interface for the HomeStation device.
+ * @file    sensor.hpp
+ * @brief   MAX9814 microphone as seen by the application (sound detection from the raw signal).
  * @author  Lucas Pichon
  * @date    2026-07-27
  */
 
 #pragma once
 
-#include <Arduino.h>
+#include <stdio.h>
 #include "../sensor.hpp"
+#include "../analog_input.hpp"
 
 
 // ============================================================
@@ -19,7 +20,7 @@ class MAX9814Sensor : public Sensor
 {
     // ── Private members ───────────────────────────────────────────────────
     private:
-        int pin;  // Analog GPIO pin connected to the MAX9814 output
+        AnalogInput input;  // Low-level access to the MAX9814 analog output
 
         bool soundDetected = false; // Indicates whether sound has been detected since the last read
 
@@ -39,25 +40,26 @@ class MAX9814Sensor : public Sensor
     public:
 
         /**
-         * @brief Constructor for MAX9814Sensor.
          * @param pin Analog GPIO pin connected to the MAX9814 output.
          */
         MAX9814Sensor(int pin);
 
         /**
-         * @brief Update the sound detection state.
+         * @brief Sample the signal and update the sound detection state.
+         *
+         * Must be called continuously, much faster than BUCKET_MS.
          */
-        void update();
+        void update() override;
 
         /**
-         * @brief Initialize the MAX9814 sensor.
+         * @brief Configure the analog input and reset the sampling window.
          * @return true after the sensor has been initialized.
          */
         bool begin() override;
 
         /**
          * @brief Read and consume the current sound detection event.
-         * @param m Measurement object that will receive the sound state.
+         * @param m Measurement that receives the sound state.
          * @return true after the sound state has been read.
          */
         bool read(Measurement& m) override;
@@ -75,33 +77,20 @@ class MAX9814Sensor : public Sensor
 // Implementations of MAX9814Sensor methods
 // ============================================================
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 inline MAX9814Sensor::MAX9814Sensor(int pin)
-    : Sensor("MAX9814"),
-      pin(pin)
+    : Sensor("MAX9814", "", MAX9814_BIT),
+      input(pin)
 {
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Initialization
-// ─────────────────────────────────────────────────────────────────────────────
-
 inline bool MAX9814Sensor::begin()
 {
-    // Configure the MAX9814 output as an analog input
-    pinMode(pin, INPUT);
-
-    // Configure the ADC for 12-bit resolution (0-4095)
-    analogReadResolution(12);
+    input.begin();
 
     for (int i = 0; i < BUCKET_COUNT; i++)
     {
         bucketMax[i] = 0;
-        bucketMin[i] = 4095;
+        bucketMin[i] = AnalogInput::MAX_VALUE;
     }
     bucketStart = millis();
 
@@ -110,17 +99,9 @@ inline bool MAX9814Sensor::begin()
     return true;
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sound Detection Update
-// ─────────────────────────────────────────────────────────────────────────────
-
 inline void MAX9814Sensor::update()
 {
-    if (!initialized) return;
-
-    // Read the current analog microphone signal
-    int sample = analogRead(pin);
+    int sample = input.read();
 
     // Update the current bucket with the new sample
     if (sample > bucketMax[currentBucket]) bucketMax[currentBucket] = sample;
@@ -130,8 +111,8 @@ inline void MAX9814Sensor::update()
     if (now - bucketStart >= BUCKET_MS)
     {
         // Evaluate the amplitude over the whole sliding window
-        int maxValue = 0; 
-        int minValue = 4095;
+        int maxValue = 0;
+        int minValue = AnalogInput::MAX_VALUE;
 
         for (uint8_t i = 0; i < BUCKET_COUNT; i++)
         {
@@ -143,25 +124,17 @@ inline void MAX9814Sensor::update()
         {
             soundDetected = true;
         }
-        Serial.print("delta: ");
-        Serial.println(maxValue - minValue);
 
-        // Move to the next bucket, overwritting the oldest one
+        // Move to the next bucket, overwriting the oldest one
         currentBucket = (currentBucket + 1) % BUCKET_COUNT;
         bucketMax[currentBucket] = 0;
-        bucketMin[currentBucket] = 4095;
+        bucketMin[currentBucket] = AnalogInput::MAX_VALUE;
         bucketStart = now;
     }
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Measurement Reading
-// ─────────────────────────────────────────────────────────────────────────────
-
 inline bool MAX9814Sensor::read(Measurement& m)
 {
-    // Copy the sound detection event into the Measurement structure
     m.sound = soundDetected;
 
     // Reset the event flag after it has been consumed
@@ -170,23 +143,11 @@ inline bool MAX9814Sensor::read(Measurement& m)
     return true;
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Display Formatting
-// ─────────────────────────────────────────────────────────────────────────────
-
 inline const char* MAX9814Sensor::displayValue(const Measurement& m) const
 {
     static char buffer[64];
 
-    // Format the sensor name and sound detection status
-    snprintf(
-        buffer,
-        sizeof(buffer),
-        "%s: %s",
-        getName(),
-        m.sound ? "Sound detected" : "No sound"
-    );
+    snprintf(buffer, sizeof(buffer), "%s: %s", getName(), m.sound ? "Sound detected" : "No sound");
 
     return buffer;
 }

@@ -1,5 +1,5 @@
 /**
- * @file    driver_FC-51.hpp
+ * @file    sensor.hpp
  * @brief   FC-51 infrared obstacle detection sensor interface for the HomeStation device.
  * @author  Lucas Pichon
  * @date    2026-07-27
@@ -51,7 +51,7 @@ class FC51Sensor : public InterruptSensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline FC51Sensor::FC51Sensor(int pin)
-    : InterruptSensor("FC-51", pin, LOW, true) // Output goes LOW when an obstacle is detected
+    : InterruptSensor("FC-51", FC51_BIT, pin, LOW, true) // Output goes LOW when an obstacle is detected
 {
 }
 

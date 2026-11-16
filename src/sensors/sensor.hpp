@@ -9,12 +9,17 @@
 
 #include <stdio.h>
 #include "../core/measurement.hpp"
+#include "../core/sensors_bit.hpp"
 
 
 // ============================================================
 // Sensor class definition
 // ============================================================
 
+/**
+ * @brief Application-level view of a sensor: identity, mask bit, and mapping
+ *        of the hardware readings into a Measurement.
+ */
 class Sensor
 {
     // ── Protected members ──────────────────────────────────────────────────
@@ -25,39 +30,20 @@ class Sensor
     private:
         char sensorName[32];        // Name of the sensor
         char unit[16];              // Measurement unit of the sensor
-
-        static inline int sensorCount; // Number of currently existing sensors
+        SensorsBit sensorBit;       // Bit of this sensor in the enabled-sensors mask
 
     // ── Public interface ────────────────────────────────────────────────────
     public:
 
         /**
-         * @brief Default constructor for Sensor.
-         *
-         * Creates a sensor with an automatically generated name and no unit.
-         */
-        Sensor();
-
-        /**
-         * @brief Constructor for Sensor with a custom name.
-         * @param name Name assigned to the sensor.
-         */
-        Sensor(const char* name);
-
-        /**
-         * @brief Constructor for Sensor with a custom name and unit.
+         * @brief Constructor for Sensor.
          * @param name Name assigned to the sensor.
          * @param unit Measurement unit associated with the sensor.
+         * @param bit  Bit identifying the sensor in the enabled-sensors mask.
          */
-        Sensor(const char* name, const char* unit);
+        Sensor(const char* name, const char* unit, SensorsBit bit);
 
-        /**
-         * @brief Virtual destructor for the Sensor class.
-         *
-         * Decrements the global sensor instance counter when a sensor
-         * object is destroyed.
-         */
-        virtual ~Sensor();
+        virtual ~Sensor() = default;
 
         /**
          * @brief Get the name of the sensor.
@@ -72,31 +58,32 @@ class Sensor
         const char* getUnit() const;
 
         /**
+         * @brief Get the bit of this sensor in the enabled-sensors mask.
+         */
+        SensorsBit bit() const;
+
+        /**
          * @brief Check whether the sensor has been initialized.
          * @return true if the sensor is initialized, false otherwise.
          */
         bool isInitialized() const;
 
         /**
-         * @brief Get the number of currently existing sensor instances.
-         * @return Number of active Sensor objects.
+         * @brief Background sampling hook, called regularly while the sensor is enabled and initialized.
+         *
+         * Does nothing by default; override it for sensors that must be sampled
+         * continuously, independently of read().
          */
-        static int getSensorCount();
+        virtual void update() {}
 
         /**
          * @brief Initialize the sensor.
-         *
-         * This method must be implemented by each derived sensor class.
-         *
          * @return true if initialization was successful, false otherwise.
          */
         virtual bool begin() = 0;
 
         /**
          * @brief Read a measurement from the sensor.
-         *
-         * This method must be implemented by each derived sensor class.
-         *
          * @param m Measurement object that will receive the sensor data.
          * @return true if the measurement was successfully acquired,
          *         false otherwise.
@@ -105,9 +92,6 @@ class Sensor
 
         /**
          * @brief Format a measurement value for display.
-         *
-         * This method must be implemented by each derived sensor class.
-         *
          * @param m Measurement to format.
          * @return Pointer to a null-terminated string containing the
          *         formatted value.
@@ -120,45 +104,12 @@ class Sensor
 // Implementations of Sensor methods
 // ============================================================
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Default Constructor
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline Sensor::Sensor() : Sensor("", "")
+inline Sensor::Sensor(const char* name, const char* unit, SensorsBit bit)
+    : sensorBit(bit)
 {
-    // Generate a default name using the current sensor count
-    snprintf(sensorName, sizeof(sensorName), "Sensor_%d", sensorCount - 1);
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Name Constructor
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline Sensor::Sensor(const char* name) : Sensor(name, "")
-{
-
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Name and Unit Constructor
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline Sensor::Sensor(const char* name, const char* unit)
-{
-    // Store the sensor name and measurement unit
     snprintf(sensorName, sizeof(sensorName), "%s", name);
     snprintf(this->unit, sizeof(this->unit), "%s", unit);
-
-    // Register the new sensor instance
-    Sensor::sensorCount++;
 }
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sensor Information
-// ─────────────────────────────────────────────────────────────────────────────
 
 inline const char* Sensor::getName() const
 {
@@ -170,23 +121,12 @@ inline const char* Sensor::getUnit() const
     return unit;
 }
 
-inline int Sensor::getSensorCount()
+inline SensorsBit Sensor::bit() const
 {
-    return sensorCount;
+    return sensorBit;
 }
 
 inline bool Sensor::isInitialized() const
 {
     return initialized;
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Destructor
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline Sensor::~Sensor()
-{
-    // Remove this instance from the global sensor count
-    sensorCount--;
 }

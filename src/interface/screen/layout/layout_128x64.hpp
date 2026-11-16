@@ -10,7 +10,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "screen_layout.hpp"
+#include "layout.hpp"
 #include "../../../core/firmware_version.hpp"
 
 class Layout128x64 : public ScreenLayout

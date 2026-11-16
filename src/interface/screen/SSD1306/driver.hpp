@@ -1,5 +1,5 @@
 /**
- * @file    driver_SSD1306.hpp
+ * @file    driver.hpp
  * @brief   SSD1306 OLED driver for the HomeStation device.
  * @author  Lucas Pichon
  * @date    2026-07-28
@@ -12,7 +12,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#include "../screen_interface.hpp"
+#include "../interface.hpp"
 
 // ============================================================
 // SSD1306 class definition

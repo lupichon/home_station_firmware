@@ -1,5 +1,5 @@
 /**
- * @file    screen_controller.hpp
+ * @file    controller.hpp
  * @brief   Display navigation and inactivity sleep for the HomeStation device.
  *          Page rendering is delegated to a screen layout.
  * @author  Lucas Pichon
@@ -10,7 +10,7 @@
 
 #include <Arduino.h>
 
-#include "layout/screen_layout.hpp"
+#include "layout/layout.hpp"
 #include "../../core/measurement.hpp"
 #include "../../core/clock.hpp"
 

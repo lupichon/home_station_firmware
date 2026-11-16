@@ -1,5 +1,5 @@
 /**
- * @file    driver_HC-SR501.hpp
+ * @file    sensor.hpp
  * @brief   HC-SR501 PIR motion sensor interface for the HomeStation device.
  * @author  Lucas Pichon
  * @date    2026-07-23
@@ -51,7 +51,7 @@ class HCSR501Sensor : public InterruptSensor
 // ─────────────────────────────────────────────────────────────────────────────
 
 inline HCSR501Sensor::HCSR501Sensor(int pin)
-    : InterruptSensor("HC-SR501", pin, HIGH, true) // Output goes HIGH when motion is detected
+    : InterruptSensor("HC-SR501", HCSR501_BIT, pin, HIGH, true) // Output goes HIGH when motion is detected
 {
 }
 

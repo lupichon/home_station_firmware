@@ -23,15 +23,17 @@
 #include "core/firmware_version.hpp"
 
 // ==================== Sensors ====================
-#include "sensors/BH1750/driver_BH1750.hpp"
-#include "sensors/HC-SR501/driver_HC-SR501.hpp"
-#include "sensors/SCD41/driver_SCD41.hpp"
-#include "sensors/MAX9814/driver_MAX9814.hpp"
-#include "sensors/FC-51/driver_FC-51.hpp"
-#include "sensors/SW-420/driver_SW-420.hpp"
-#include "sensors/MQ-2/driver_MQ-2.hpp"
-#include "sensors/BMP280/driver_BMP280.hpp"
-#include "sensors/SGP41/driver_SGP41.hpp"
+#include "sensors/sensor_manager.hpp"
+#include "sensors/BH1750/sensor.hpp"
+#include "sensors/HC-SR501/sensor.hpp"
+#include "sensors/SCD41/sensor.hpp"
+#include "sensors/MAX9814/sensor.hpp"
+#include "sensors/FC-51/sensor.hpp"
+#include "sensors/SW-420/sensor.hpp"
+#include "sensors/MQ-2/sensor.hpp"
+#include "sensors/BMP280/sensor.hpp"
+#include "sensors/SGP41/sensor.hpp"
+#include "sensors/reed_switch/sensor.hpp"
 
 // ==================== Communication ====================
 #include "communication/bluetooth/bluetooth.hpp"
@@ -39,8 +41,8 @@
 #include "communication/LoRaWAN/lorawan.hpp"
 
 // ==================== Interface ====================
-#include "interface/screen/screen_controller.hpp"
-#include "interface/screen/SSD1306/driver_SSD1306.hpp"
+#include "interface/screen/controller.hpp"
+#include "interface/screen/SSD1306/driver.hpp"
 #include "interface/screen/layout/layout_128x64.hpp"
 #include "interface/led/led.hpp"
 #include "interface/led/rgb_led.hpp"
@@ -112,7 +114,8 @@ FC51Sensor    obstacleSensor(FC_51_PIN);          // Obstacle
 SW420Sensor   vibrationSensor(SW_420_PIN);        // Vibration
 MQ2Sensor     gasSensor(MQ2_PIN);                 // Gas
 BMP280Sensor  pressureSensor;                     // Pressure
-SGP41Sensor   VocNoxSensor;                       // VOC and NOx (must be after SCD41)
+SGP41Sensor   vocNoxSensor(co2TempHumiSensor);    // VOC and NOx, compensated by the SCD41
+ReedSwitchSensor doorSensor;                      // Door state, received over Bluetooth
 
 Sensor* sensors[] =
 {
@@ -124,8 +127,11 @@ Sensor* sensors[] =
     &vibrationSensor,
     &gasSensor,
     &pressureSensor,
-    &VocNoxSensor // Must be after SCD41
+    &vocNoxSensor,
+    &doorSensor
 };
+
+SensorManager sensorManager(sensors, sizeof(sensors) / sizeof(sensors[0]));
 
 // ==================== Data ====================
 Measurement     measurement;
@@ -154,26 +160,9 @@ constexpr unsigned long lorawanAutoUplinkInterval_S = 600;
 constexpr unsigned long lorawanFirstUplinkUptime_S  = 1800;
 
 // ==================== Counts ====================
-int sensorCount = Sensor::getSensorCount();
 int commCount   = Communication::getCommunicationCount();
 
-constexpr size_t SENSOR_COUNT = sizeof(sensors) / sizeof(sensors[0]);
 constexpr size_t COMM_COUNT   = sizeof(communications) / sizeof(communications[0]);
-
-// ==================== Sensor Read Status ====================
-bool sensorLastReadOk[SENSOR_COUNT] = {false};
-
-constexpr int MAX_CONSECUTIVE_FAILED_READS = 3;
-int sensorFailureCount[SENSOR_COUNT] = {0};
-
-// ==================== SGP41 ====================
-constexpr size_t SGP41_SENSOR_INDEX = 8; // Must match the position of VocNoxSensor in sensors[]
-static_assert(SGP41_SENSOR_INDEX < SENSOR_COUNT, "SGP41 index out of range");
-
-// ==================== Variables state ====================
-float cachedTemperature = NAN;
-float cachedHumidity    = NAN;
-bool doorOpen = false;
 
 // ============== Utility functions ====================
 
@@ -259,13 +248,11 @@ void setWifiCallbacks()
     wifi.setSensorInfoProvider([]() -> String
     {
         String json = "[";
-        for (int i = 0; i < sensorCount; i++)
+        for (size_t i = 0; i < sensorManager.count(); i++)
         {
             if (i > 0) json += ",";
-            json += "\"" + String(sensors[i]->getName()) + "\"";
+            json += "\"" + String(sensorManager.at(i).getName()) + "\"";
         }
-        if (sensorCount > 0) json += ",";
-        json += "\"reed switch\"";
         json += "]";
         return json;
     });
@@ -467,14 +454,14 @@ void setWifiCallbacks()
 
         // --- Sensors ---
         json += "\"sensors\":[";
-        for (int i = 0; i < SENSOR_COUNT; i++)
+        for (size_t i = 0; i < sensorManager.count(); i++)
         {
             if (i > 0) json += ",";
-            bool enabled = isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i));
-            json += "{\"name\":\"" + String(sensors[i]->getName()) + "\",";
+            bool enabled = sensorManager.isEnabled(i, deviceConfig.enabledSensorsMask);
+            json += "{\"name\":\"" + String(sensorManager.at(i).getName()) + "\",";
             json += "\"enabled\":" + String(enabled ? 1 : 0) + ",";
-            json += "\"initialized\":" + String(sensors[i]->isInitialized() ? 1 : 0) + ",";
-            json += "\"lastReadOK\":" + String(sensorLastReadOk[i] ? 1 : 0) + "}";
+            json += "\"initialized\":" + String(sensorManager.at(i).isInitialized() ? 1 : 0) + ",";
+            json += "\"lastReadOK\":" + String(sensorManager.lastReadSucceeded(i) ? 1 : 0) + "}";
         }
         json += "],";
 
@@ -551,25 +538,14 @@ void setBluetoothCallbacks()
         }
     });
 
-    if (isSensorEnabled(deviceConfig.enabledSensorsMask, SensorsBit::REED_SWITCH_BIT))
+    bluetooth.setDoorStateCallback([](bool open)
     {
-        bluetooth.setDoorStateCallback([](bool open)
-        {
-            if (open)
-            {
-                doorOpen = true;
-                #if DEBUG_ENABLE
-                Serial.println("Door open.");
-                #endif
-            }
-            else
-            {
-                #if DEBUG_ENABLE
-                Serial.println("Door closed.");
-                #endif
-            }
-        });
-    }
+        doorSensor.onStateReceived(open);
+
+        #if DEBUG_ENABLE
+        Serial.println(open ? "Door open." : "Door closed.");
+        #endif
+    });
 }
 
 // Set up the callbacks for LoRaWAN communication to handle join events and transmission completion
@@ -771,25 +747,17 @@ void initSensors()
 {
     pressureSensor.setAltitude(deviceConfig.altitudeM);
 
-    for(int i = 0; i < SENSOR_COUNT; i++)
-    {
-        if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i))) continue; 
+    sensorManager.begin(deviceConfig.enabledSensorsMask);
 
-        if(!sensors[i]->begin())
-        {
-            #if DEBUG_ENABLE
-            Serial.print("Error: Initialization failed for sensor: ");
-            Serial.println(sensors[i]->getName());
-            #endif
-        }
-        else
-        {
-            #if DEBUG_ENABLE
-            Serial.print("OK : ");
-            Serial.println(sensors[i]->getName());
-            #endif
-        }
+    #if DEBUG_ENABLE
+    for (size_t i = 0; i < sensorManager.count(); i++)
+    {
+        if (!sensorManager.isEnabled(i, deviceConfig.enabledSensorsMask)) continue;
+
+        Serial.print(sensorManager.at(i).isInitialized() ? "OK : " : "Error: Initialization failed for sensor: ");
+        Serial.println(sensorManager.at(i).getName());
     }
+    #endif
 }
 
 // Initialize the watchdog timer to automatically reset the ESP if it becomes unresponsive.
@@ -819,11 +787,10 @@ void handleBuzzer()
     buzzer.update();
 }
 
-// Handle the sound sensor update if it is enabled in the device configuration
-void handleSoundSensor()
+// Handle the background sampling of the sensors that need it (sound, VOC/NOx)
+void handleSensorsUpdate()
 {
-    if (!isSensorEnabled(deviceConfig.enabledSensorsMask, SensorsBit::MAX9814_BIT)) return; 
-    soundSensor.update();
+    sensorManager.update(deviceConfig.enabledSensorsMask);
 }
 
 // Handle the WiFi communication loop
@@ -954,63 +921,19 @@ void handleMeasurements()
 {
     clearMeasurement(measurement);
 
-    bool success = true;
-    for(int i = 0; i < SENSOR_COUNT; i++)
+    bool success = sensorManager.readAll(measurement, deviceConfig.enabledSensorsMask);
+
+    #if DEBUG_ENABLE
+    for (size_t i = 0; i < sensorManager.count(); i++)
     {
-        if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << i)))
-        {
-            sensorLastReadOk[i] = false;
-            continue;
-        }
+        if (!sensorManager.isEnabled(i, deviceConfig.enabledSensorsMask)) continue;
 
-        Sensor& sensor = *sensors[i];
-
-        if (!sensor.isInitialized())
-        {
-            // Not initialized: retry begin() on every cycle
-            sensor.begin();
-            sensorLastReadOk[i] = false;
-            sensorFailureCount[i] = 0;
-            success = false;
-            continue;
-        }
-
-        // Initialized: attempt a read
-        bool successSensor = sensor.read(measurement);
-        sensorLastReadOk[i] = successSensor;
-        success &= successSensor;
-
-        if (successSensor)
-        {
-            sensorFailureCount[i] = 0;
-
-            #if DEBUG_ENABLE 
-            Serial.println(sensor.displayValue(measurement));
-            #endif
-        }
-        else
-        {
-            sensorFailureCount[i]++;
-
-            #if DEBUG_ENABLE
-            Serial.println(String(sensor.getName()) + ": failed to read (" + String(sensorFailureCount[i]) + "/" + String(MAX_CONSECUTIVE_FAILED_READS) + ")");
-            #endif
-
-            if (sensorFailureCount[i] >= MAX_CONSECUTIVE_FAILED_READS)
-            {
-                sensor.begin();
-                sensorFailureCount[i] = 0;
-            }
-        }
+        const Sensor& sensor = sensorManager.at(i);
+        Serial.println(sensorManager.lastReadSucceeded(i) ? sensor.displayValue(measurement)
+                                                          : (String(sensor.getName()) + ": failed to read").c_str());
     }
-    if (isSensorEnabled(deviceConfig.enabledSensorsMask, REED_SWITCH_BIT))
-    {
-        measurement.doorOpen = doorOpen;
-        doorOpen = false;
-        #if DEBUG_ENABLE
-        Serial.println(String("Door state: ") + (measurement.doorOpen ? "open" : "closed"));    
-        #endif
-    }
+    #endif
+
     measurement.timestamp = systemClock.now();
     measurement.acquiredMs = millis();
 
@@ -1018,9 +941,6 @@ void handleMeasurements()
 
     dataSize          = serialize(measurement, buffer, sizeof(buffer));
     encryptedDataSize = encrypt(buffer, dataSize, deviceConfig.aesKey, encryptedBuffer, measurement.timestamp);
-
-    cachedTemperature = measurement.temperature;
-    cachedHumidity    = measurement.humidity;
 }
 
 // Handle the accumulation of measurements for later processing
@@ -1073,22 +993,6 @@ void handleWatchdog()
     esp_task_wdt_reset();
 }
 
-// Handle the SGP41: must be called at a constant 1 s interval, because the VOC/NOx algorithms assume one sample per second.
-void handleVocNoxSensor()
-{
-    if (!isSensorEnabled(deviceConfig.enabledSensorsMask, static_cast<SensorsBit>(1 << SGP41_SENSOR_INDEX)))
-    {
-        sensorLastReadOk[SGP41_SENSOR_INDEX] = false;
-        return;
-    }
-
-    Measurement tempMeasurement;
-    tempMeasurement.humidity    = cachedHumidity;
-    tempMeasurement.temperature = cachedTemperature;
-
-    VocNoxSensor.read(tempMeasurement);
-}
-
 #if DEBUG_ENABLE
 // =================== Debug Functions ====================
 void printDebugInfo()
@@ -1100,7 +1004,7 @@ void printDebugInfo()
 
     Serial.println("--- Sensors ---");
     Serial.print("Number of sensors: ");
-    Serial.println(sensorCount);
+    Serial.println(sensorManager.count());
 
     Serial.println("--- Communication ---");
     Serial.println(bluetooth.isInitialized()
@@ -1191,7 +1095,7 @@ void loop()
     handleWatchdog();
     handleLoRaWAN();
     handleWifi();
-    handleSoundSensor();
+    handleSensorsUpdate();
 
     // Task executed every 10 ms
     if (now - last10Ms >= TASK_10_MS)
@@ -1219,10 +1123,6 @@ void loop()
         if (isLiveDataRequested())
         {
             handleMeasurements();
-        }
-        else
-        {
-            handleVocNoxSensor();   // Sensirion algorithms need to be called periodically (every second even if data are not used)
         }
         handleBluetooth();
     }
