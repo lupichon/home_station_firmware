@@ -85,8 +85,9 @@ namespace station_cst
     constexpr unsigned long TASK_60000_MS = 60000;
 
     // LoRaWAN
+    constexpr unsigned long SENSOR_WARMUP_S                = 1800;
     constexpr unsigned long LORAWAN_AUTO_UPLINK_INTERVAL_S = 600;
-    constexpr unsigned long LORAWAN_FIRST_UPLINK_UPTIME_S  = 1800;
+    constexpr unsigned long LORAWAN_FIRST_UPLINK_UPTIME_S  = SENSOR_WARMUP_S + LORAWAN_AUTO_UPLINK_INTERVAL_S;
 }
 
 // ============================================================
@@ -114,6 +115,7 @@ class Station
         // ---- Helpers (station.cpp) ----
         bool isMeasurementStale(unsigned long now);
         bool isLiveDataRequested();
+        bool isWarmedUp();
         void scheduleReboot(unsigned long delayMs);
 
         // ---- Initialization (station_init.cpp) ----
@@ -218,4 +220,7 @@ class Station
         unsigned long buttonPressStartMs    = 0;
         bool          buttonWifiTriggered   = false;
         bool          buttonRebootTriggered = false;
+
+        // ---- Sensor warm-up state ----
+        bool warmedUp = false;
 };

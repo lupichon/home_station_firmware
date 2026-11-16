@@ -115,7 +115,10 @@ void Station::loop()
             {
                 handleMeasurements();
             }
-            handleAccumulator();
+            if (isWarmedUp())
+            {
+                handleAccumulator();
+            }
         }
     }
 }
@@ -144,4 +147,14 @@ bool Station::isLiveDataRequested()
 void Station::scheduleReboot(unsigned long delayMs)
 {
     rebootAtMs = millis() + delayMs;
+}
+
+// Check if the sensors have completed their warm-up period
+bool Station::isWarmedUp()
+{
+    if(!warmedUp && millis() >= SENSOR_WARMUP_S * 1000UL)
+    {
+        warmedUp = true;
+    }
+    return warmedUp;
 }
